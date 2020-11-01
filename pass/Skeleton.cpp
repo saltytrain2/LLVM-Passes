@@ -55,10 +55,6 @@ namespace {
               bModified |= true;
             }
           }
-          
-
-          
-           
           }
         }
       }

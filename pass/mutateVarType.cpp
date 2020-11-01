@@ -20,12 +20,12 @@ namespace {
         std::string svariable ("global_var");
         //ValueSymbolTable& symbolTable = F.getValueSymbolTable();
         //Value* target = F.getValueSymbolTable()->lookup(svariable);
-       
-          for (auto it = M.getValueSymbolTable().begin(); it != M.getValueSymbolTable().end(); ++it) {
+        if (getValueSymbolTable()) {
+          for (auto it = getValueSymbolTable()->begin(); it != getValueSymbolTable()->end(); ++it) {
           
             errs() << (it->getKey()) << it->second << "\n";
           }
-        
+        }
         
         // AllocaInst* old_target = dyn_cast<AllocaInst>(target);
         // errs() <<"old_target: " << *target << "\n";
