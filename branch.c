@@ -13,6 +13,15 @@ int main(){
     if (x != 1){
         printf("wrong answer 2\n");
     }
+
+    if (global_ptr) {
+        printf("correct answer");
+    }
+    else {
+        printf("wrong answer 3");
+    }
+    
+
     if(global_ptr != NULL)
         printf("correct answer");
     else

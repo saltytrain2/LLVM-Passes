@@ -32,8 +32,9 @@ namespace {
           // op->getOperand(1)->printAsOperand(errs());
           // errs() << "\n";
           
-          //op->getOperand(0)->print(errs());
-          errs() << op->getName().size();
+          
+          errs() << *op << "\n";
+
           
           
           Value *lhs = op->getOperand(0);
@@ -43,9 +44,11 @@ namespace {
           // // Everywhere the old instruction was used as an operand, use our
           // // new multiply instruction instead.
           if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
+            errs() << "entered constant op1 \n";
             if (CI->isNullValue()) {
-              for (auto &U : op->uses()) {
+              errs() << "entered null op1 \n";
 
+              for (auto &U : op->uses()) {
                 User *user = U.getUser();  // A User is anything with operands.
                 user->setOperand(U.getOperandNo(), mul);
               }
