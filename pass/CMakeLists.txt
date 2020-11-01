@@ -1,6 +1,6 @@
 add_library(SkeletonPass MODULE
     # List your source files here.
-    mutateVarType.cpp
+    Skeleton.cpp
     
 )
 
