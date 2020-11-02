@@ -21,7 +21,6 @@ int main(){
         printf("wrong answer 3");
     }
     
-
     if(global_ptr != NULL)
         printf("correct answer");
     else

@@ -31,18 +31,13 @@ namespace {
           // errs() << "\n";
           // op->getOperand(1)->printAsOperand(errs());
           // errs() << "\n";
-          
-          
           errs() << *op << "\n";
-
-          
-          
           Value *lhs = op->getOperand(0);
           Value *rhs = op->getOperand(1);
-          Value *mul = builder.CreateICmpEQ(lhs, rhs);
+          Value *inst = builder.CreateICmpEQ(lhs, rhs);
 
           // // Everywhere the old instruction was used as an operand, use our
-          // // new multiply instruction instead.
+          // // new Compare instruction instead.
           if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
             errs() << "entered constant op1 \n";
             if (CI->isNullValue()) {
@@ -50,7 +45,7 @@ namespace {
 
               for (auto &U : op->uses()) {
                 User *user = U.getUser();  // A User is anything with operands.
-                user->setOperand(U.getOperandNo(), mul);
+                user->setOperand(U.getOperandNo(), inst);
               }
               bModified |= true;
             }
