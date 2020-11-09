@@ -34,8 +34,6 @@ namespace {
           // Insert at the point where the instruction `op` appears.
           IRBuilder<> builder(op);
 
-          // Make a multiply with the same operands as `op`.
-
           // op->getOperand(0)->printAsOperand(errs());
           // errs() << "\n";
           // op->getOperand(1)->printAsOperand(errs());
@@ -67,6 +65,7 @@ namespace {
   };
 }
 
+
 namespace {
   struct MemoryPass : public FunctionPass {
     static char ID;
@@ -79,13 +78,9 @@ namespace {
       
         if (auto *op = dyn_cast<LoadInst>(&I)) {
           //getAlign() Return the alignment of the memory that is being allocated by the instruction. More...
-
-          
-
           // Insert at the point where the instruction `op` appears.
           IRBuilder<> builder(op);
 
-          // Make a multiply with the same operands as `op`.
 
           op->getOperand(0)->printAsOperand(errs());
           errs() << "\n";
@@ -199,10 +194,6 @@ namespace {
                bModified = true;
             }
           }
-          
-
-          
-        
       }
     }
     return bModified;
@@ -242,4 +233,4 @@ static void registerMutatePass(const PassManagerBuilder &,
 
 static RegisterStandardPasses
   RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-                 registerMutatePass);
+                 registerMemoryPass);
