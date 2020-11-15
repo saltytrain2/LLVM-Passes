@@ -16,7 +16,7 @@ static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the 
 
 static cl::opt<unsigned> MutationOperandLocation("mutation_op_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
 
-static cl::opt<unsigned> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul"), cl::value_desc("unsigned integer"));
+static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul"), cl::value_desc("String"));
 
 
 namespace {
@@ -73,9 +73,9 @@ namespace {
 
     virtual bool runOnFunction(Function &F) {
       bool bModified = false;
+      int counter = 0;
       for (auto &B : F) {
         for (auto& I : B) {
-      
         if (auto *op = dyn_cast<LoadInst>(&I)) {
           //getAlign() Return the alignment of the memory that is being allocated by the instruction. More...
           // Insert at the point where the instruction `op` appears.
@@ -102,6 +102,10 @@ namespace {
         
           op->getOperand(0)->printAsOperand(errs());
           errs() << "\n";
+          if(counter++ == 1){
+            errs() << "Returned early" << "\n";
+            return bModified;
+          }
           
         }
       }
@@ -119,14 +123,16 @@ namespace {
 
     virtual bool runOnFunction(Function &F) {
       bool bModified = false;
-      errs() << Instruction::Sub << "\n";
+     
       for (auto &B : F) {
+        
         for (auto& I : B) {
-          instrCnt++;
-          if (auto *op = dyn_cast<BinaryOperator>(&I)) { 
-            errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+          errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 
-          }
+          instrCnt++;
+          // if (auto *op = dyn_cast<BinaryOperator>(&I)) { 
+          //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+          // }
         
       }
     }
@@ -141,64 +147,147 @@ namespace {
     static char ID;
     MutatePass() : FunctionPass(ID) {}
 
-    Instruction* getRequestedMutationBinaryOp(Instruction* I) {
-      switch (MutationOp) {
-        case Instruction::Add:
-          return BinaryOperator::Create(Instruction::Add, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::Sub:
-          return BinaryOperator::Create(Instruction::Sub, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::Mul:
-          return BinaryOperator::Create(Instruction::Mul, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::UDiv:
-          return BinaryOperator::Create(Instruction::UDiv, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::SDiv:
-          return BinaryOperator::Create(Instruction::SDiv, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::URem:
-          return BinaryOperator::Create(Instruction::URem, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::SRem:
-          return BinaryOperator::Create(Instruction::SRem, I->getOperand(0), I->getOperand(1), "optimute");
-
-        case Instruction::FAdd:
-          return BinaryOperator::Create(Instruction::FAdd, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::FSub:
-          return BinaryOperator::Create(Instruction::FSub, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::FMul:
-          return BinaryOperator::Create(Instruction::FMul, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::FDiv:
-          return BinaryOperator::Create(Instruction::FDiv, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::FRem:
-          return BinaryOperator::Create(Instruction::FRem, I->getOperand(0), I->getOperand(1), "optimute");
-
-        case Instruction::And:
-          return BinaryOperator::Create(Instruction::And, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::Or:
-          return BinaryOperator::Create(Instruction::Or, I->getOperand(0), I->getOperand(1), "optimute");
-        case Instruction::Xor:
-          return BinaryOperator::Create(Instruction::Xor, I->getOperand(0), I->getOperand(1), "optimute");
+    Instruction* getRequestSpecialOp(Instruction* I) {
+      if(MutationOp == "loadint8"){
+        auto *op = dyn_cast<LoadInst>(I);
+        IRBuilder<> builder(op);
+        LLVMContext &context = I->getFunction()->getContext();
+        Type* type = Type::getInt8Ty(context); //Note this only should be done if the type is larger than 8. ie you mutate a 16 byte load to an 8 byte load.
+        Instruction *inst = builder.CreateLoad(type, op->getOperand(0));
+        
+        return inst;
       }
+      return nullptr;
     }
+    
+    Instruction* getRequestedMutationBinaryOp(Instruction* I) {
+      if(MutationOp == "add"){
+        return BinaryOperator::Create(Instruction::Add, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "sub"){
+        return BinaryOperator::Create(Instruction::Sub, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "mul"){
+        return BinaryOperator::Create(Instruction::Mul, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "udiv"){
+        return BinaryOperator::Create(Instruction::UDiv, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "sdiv"){
+        return BinaryOperator::Create(Instruction::SDiv, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "urem"){
+        return BinaryOperator::Create(Instruction::URem, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "srem"){
+        return BinaryOperator::Create(Instruction::SRem, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "fadd"){
+        return BinaryOperator::Create(Instruction::FAdd, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "fsub"){
+        return BinaryOperator::Create(Instruction::FSub, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "fmul"){
+        return BinaryOperator::Create(Instruction::FMul, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "fdiv"){
+        return BinaryOperator::Create(Instruction::FDiv, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "frem"){
+        return BinaryOperator::Create(Instruction::FRem, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "and"){
+        return BinaryOperator::Create(Instruction::And, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "or"){
+        return BinaryOperator::Create(Instruction::Or, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "xor"){
+        return BinaryOperator::Create(Instruction::Xor, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      return nullptr; //User didn't specify a valid mutationop  
+    }
+
+    Instruction* getRequestedMutantIcmpInst(Instruction* I, ICmpInst* cmpInst) {
+      if (MutationOp == "icmp_eq") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_EQ, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if (MutationOp == "icmp_ne"){
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_NE, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if (MutationOp == "icmp_ugt") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_UGT, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_uge") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_UGE, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_ult") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_ULT, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_ule") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_ULE, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_sgt") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_SGT, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_sge") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_SGE, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_slt") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_SLT, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      else if(MutationOp == "icmp_sle") {
+        return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_SLE, I->getOperand(0), I->getOperand(1), "optimute");
+      }
+      return nullptr;
+      
+    }
+
     virtual bool runOnFunction(Function &F) {
       bool bModified = false;
       
       for (auto &B : F) {
         for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
           Instruction *I = &*DI++;
-          instrCnt++;
-          if (auto *op = dyn_cast<BinaryOperator>(I)) { 
-            errs()<< "instr #: " << (instrCnt) << " opcode: " << I->getOpcodeName() << "\n";
 
-            if (instrCnt == MutationLocation) {
-               errs() <<"modified: " <<instrCnt << "\n";
-               Instruction* altI = getRequestedMutationBinaryOp(I);
-               ReplaceInstWithInst(I, altI);
-               bModified = true;
+          if(isa<LoadInst>(*I)){
+            MutationOp = "loadint8";
+            Instruction* altI = getRequestSpecialOp(I);
+            auto *op = dyn_cast<LoadInst>(I);
+
+            for (auto &U : op->uses()) {
+              User *user = U.getUser();  // A User is anything with operands.
+              user->setOperand(U.getOperandNo(), altI);
             }
+            //ReplaceInstWithInst(I, altI);
           }
+          
+          // if (instrCnt == MutationLocation) {
+          //   errs() << "modified: " << instrCnt;
+          //   if (isa<LoadInst>(*I)) {
+          //     errs() << " Load Instruction Replaced" << "\n";
+          //     Instruction* altI = getRequestSpecialOp(I);
+          //     ReplaceInstWithInst(I, altI);
+          //   }
+          //   else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
+          //     errs() << " Comparison Instruction Replaced" << "\n";
+          //     Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
+          //     ReplaceInstWithInst(I, altI);
+          //   }
+          //   else if (isa<BinaryOperator>(*I)) {
+          //     errs() << " Binary Operator Replaced" << "\n";
+          //     Instruction* altI = getRequestedMutationBinaryOp(I);
+          //     ReplaceInstWithInst(I, altI);
+          //   }
+          // }
+          instrCnt++;
+          bModified = true; 
+        }
       }
+      return bModified;
     }
-    return bModified;
-  }
-};
+  };
 }
 
 
@@ -207,6 +296,8 @@ char MemoryPass::ID = 1;
 char LabelPass::ID = 2;
 char MutatePass::ID = 3;
 static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
+static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
+static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
 
 
 // Automatically enable the pass.
