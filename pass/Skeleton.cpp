@@ -10,6 +10,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <sstream>
 #include <string>
+#include <unordered_map>
 using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
@@ -17,6 +18,8 @@ static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the 
 static cl::opt<unsigned> MutationOperandLocation("mutation_op_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
 
 static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul"), cl::value_desc("String"));
+
+std::unordered_map<std::string, Function*> stringToFunc;
 
 
 namespace {
@@ -130,7 +133,7 @@ namespace {
           errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 
           instrCnt++;
-          // if (auto *op = dyn_cast<BinaryOperator>(&I)) { 
+          // if (auto *op = dyn_cast<CallInst>(&I)) { 
           //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
           // }
         
@@ -143,9 +146,9 @@ namespace {
 
 
 namespace {
-  struct MutatePass : public FunctionPass {
+  struct MutatePass : public ModulePass {
     static char ID;
-    MutatePass() : FunctionPass(ID) {}
+    MutatePass() : ModulePass(ID) {}
 
     Instruction* getRequestSpecialOp(Instruction* I) {
       if(MutationOp == "loadint8"){
@@ -155,6 +158,22 @@ namespace {
         Type* type = Type::getInt8Ty(context); //Note this only should be done if the type is larger than 8. ie you mutate a 16 byte load to an 8 byte load.
         Instruction *inst = builder.CreateLoad(type, op->getOperand(0));
         
+        return inst;
+      }
+      else if(MutationOp == "swapfuncparam"){
+        auto *op = dyn_cast<CallInst>(I);
+        IRBuilder<> builder(op);
+        Value *func = op-> getCalledFunction();
+        Value *arg1 = op->getArgOperand(0);
+        Value *arg2 = op->getArgOperand(1);
+        Value *newArgs[] = {arg2, arg1};
+        Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
+        return inst;
+      }
+      else if(MutationOp == "swapplus1toplus2"){
+        auto *op = dyn_cast<CallInst>(I);
+        IRBuilder<> builder(op);
+        Instruction *inst = builder.CreateCall(stringToFunc["plusTwo"], op->getArgOperand(0));
         return inst;
       }
       return nullptr;
@@ -244,45 +263,56 @@ namespace {
       
     }
 
-    virtual bool runOnFunction(Function &F) {
+    virtual bool runOnModule(Module &M) {
       bool bModified = false;
-      
-      for (auto &B : F) {
-        for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
-          Instruction *I = &*DI++;
+      for (auto &F : M){
+        stringToFunc[F.getName()] = &F;
+        errs() << F.getName() << "\n";
+      }
 
-          if(isa<LoadInst>(*I)){
-            MutationOp = "loadint8";
-            Instruction* altI = getRequestSpecialOp(I);
-            auto *op = dyn_cast<LoadInst>(I);
+      for (auto &F: M) {
+        for (auto &B : F) {
+          for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
+            Instruction *I = &*DI++;
 
-            for (auto &U : op->uses()) {
-              User *user = U.getUser();  // A User is anything with operands.
-              user->setOperand(U.getOperandNo(), altI);
+            // if(isa<LoadInst>(*I)){
+            //   MutationOp = "loadint8";
+            //   Instruction* altI = getRequestSpecialOp(I);
+            //   auto *op = dyn_cast<LoadInst>(I);
+
+            //   for (auto &U : op->uses()) {
+            //     User *user = U.getUser();  // A User is anything with operands.
+            //     user->setOperand(U.getOperandNo(), altI);
+            //   }
+            //   //ReplaceInstWithInst(I, altI);
+            // }
+            
+            if (instrCnt == MutationLocation) {
+              errs() << "modified: " << instrCnt;
+              if (isa<LoadInst>(*I)) {
+                errs() << " Load Instruction Replaced" << "\n";
+                Instruction* altI = getRequestSpecialOp(I);
+                ReplaceInstWithInst(I, altI);
+              }
+              else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
+                errs() << " Comparison Instruction Replaced" << "\n";
+                Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
+                ReplaceInstWithInst(I, altI);
+              }
+              else if (isa<BinaryOperator>(*I)) {
+                errs() << " Binary Operator Replaced" << "\n";
+                Instruction* altI = getRequestedMutationBinaryOp(I);
+                ReplaceInstWithInst(I, altI);
+              }
+              else if(auto *op = dyn_cast<CallInst>(I)) {
+                errs() << " Function paramaters swapped" << "\n";
+                Instruction* altI = getRequestSpecialOp(I);
+                ReplaceInstWithInst(I, altI);
+              }
             }
-            //ReplaceInstWithInst(I, altI);
+            instrCnt++;
+            bModified = true; 
           }
-          
-          // if (instrCnt == MutationLocation) {
-          //   errs() << "modified: " << instrCnt;
-          //   if (isa<LoadInst>(*I)) {
-          //     errs() << " Load Instruction Replaced" << "\n";
-          //     Instruction* altI = getRequestSpecialOp(I);
-          //     ReplaceInstWithInst(I, altI);
-          //   }
-          //   else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
-          //     errs() << " Comparison Instruction Replaced" << "\n";
-          //     Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
-          //     ReplaceInstWithInst(I, altI);
-          //   }
-          //   else if (isa<BinaryOperator>(*I)) {
-          //     errs() << " Binary Operator Replaced" << "\n";
-          //     Instruction* altI = getRequestedMutationBinaryOp(I);
-          //     ReplaceInstWithInst(I, altI);
-          //   }
-          // }
-          instrCnt++;
-          bModified = true; 
         }
       }
       return bModified;
@@ -324,4 +354,4 @@ static void registerMutatePass(const PassManagerBuilder &,
 
 static RegisterStandardPasses
   RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-                 registerMemoryPass);
+                 registerLabelPass);
