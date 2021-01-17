@@ -15,9 +15,13 @@ using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
 
-static cl::opt<unsigned> MutationOperandLocation("mutation_op_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
+static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul, swapFuncCall, swapFuncParam, funcConstParam"), cl::value_desc("String"));
 
-static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul"), cl::value_desc("String"));
+static cl::opt<std::string> MutationVal("mutation_val", cl::desc("Specify value for constant mutation (Mutation_Op flag must be funcConstParam"), cl::value_desc("String"));
+
+static cl::opt<unsigned> ParameterLocation("parameter_loc", cl::desc("Specify the parameter number in the function that you would like to mutate"), cl::value_desc("unsigned integer"));
+
+static cl::opt<std::string> FunctionName("function_name", cl::desc("Specify name of the function to swap to (Mutation_Op flag must be swapFuncCall"), cl::value_desc("String"));
 
 std::unordered_map<std::string, Function*> stringToFunc;
 
@@ -160,20 +164,40 @@ namespace {
         
         return inst;
       }
-      else if(MutationOp == "swapfuncparam"){
+      else if(MutationOp == "swapFuncParam"){ //TODO - update to work w/ arg list.
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
-        Value *func = op-> getCalledFunction();
+        Value *func = op->getCalledFunction();
         Value *arg1 = op->getArgOperand(0);
         Value *arg2 = op->getArgOperand(1);
         Value *newArgs[] = {arg2, arg1};
         Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
         return inst;
       }
-      else if(MutationOp == "swapplus1toplus2"){
+      else if(MutationOp == "swapFuncCall"){ //TODO - update to work w/ arg list.
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
-        Instruction *inst = builder.CreateCall(stringToFunc["plusTwo"], op->getArgOperand(0));
+        Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], op->getArgOperand(0));
+        return inst;
+      }
+      // func(1,2,3); replace 3 with 4?
+      else if(MutationOp == "funcConstParam"){
+        auto *op = dyn_cast<CallInst>(I);
+        IRBuilder<> builder(op);
+        std::vector<Value*> argList;
+        
+
+        for(int i = 0; i < op->getCalledFunction()->arg_size(); ++i){
+          argList.push_back(op->getOperand(i));
+        }
+        //Mutate here
+        // https://stackoverflow.com/questions/16246920/how-to-create-a-constantint-in-llvm
+        LLVMContext &context = op->getCalledFunction()->getContext();
+        llvm::Type *i32_type = llvm::IntegerType::getInt32Ty(context);
+        llvm::Constant *i32_val = llvm::ConstantInt::get(i32_type, stoi(MutationVal) /*value*/, true);
+        argList[ParameterLocation] = i32_val;
+
+        Instruction *inst = builder.CreateCall(op->getCalledFunction(), argList);
         return inst;
       }
       return nullptr;
