@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
@@ -24,6 +25,7 @@ static cl::opt<unsigned> ParameterLocation("parameter_loc", cl::desc("Specify th
 static cl::opt<std::string> FunctionName("function_name", cl::desc("Specify name of the function to swap to (Mutation_Op flag must be swapFuncCall"), cl::value_desc("String"));
 
 std::unordered_map<std::string, Function*> stringToFunc;
+std::vector<Instruction*> instToDelete;
 
 
 namespace {
@@ -174,10 +176,20 @@ namespace {
         Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
         return inst;
       }
-      else if(MutationOp == "swapFuncCall"){ //TODO - update to work w/ arg list.
+      else if(MutationOp == "swapFuncCall"){
+        errs() << "Begin" << "\n";
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
-        Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], op->getArgOperand(0));
+        std::vector<Value*> argList;
+
+        for(int i = 0; i < op->getCalledFunction()->arg_size(); ++i){
+          argList.push_back(op->getOperand(i));
+        }
+
+        Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], argList);
+        //erase from parent here
+        instToDelete.push_back(I);
+        errs() << "End" << "\n";
         return inst;
       }
       // func(1,2,3); replace 3 with 4?
@@ -197,8 +209,11 @@ namespace {
         llvm::Constant *i32_val = llvm::ConstantInt::get(i32_type, stoi(MutationVal) /*value*/, true);
         argList[ParameterLocation] = i32_val;
 
-        Instruction *inst = builder.CreateCall(op->getCalledFunction(), argList);
-        return inst;
+        builder.CreateCall(op->getCalledFunction(), argList);
+        //erase from parent here
+        instToDelete.push_back(I);
+
+        //return inst;
       }
       return nullptr;
     }
@@ -295,6 +310,7 @@ namespace {
       }
 
       for (auto &F: M) {
+        
         for (auto &B : F) {
           for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
             Instruction *I = &*DI++;
@@ -329,15 +345,23 @@ namespace {
                 ReplaceInstWithInst(I, altI);
               }
               else if(auto *op = dyn_cast<CallInst>(I)) {
-                errs() << " Function paramaters swapped" << "\n";
+                errs() << " Custom Mutation Applied" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
-                ReplaceInstWithInst(I, altI);
+                //ReplaceInstWithInst(I, altI);
+                errs() << "Instruction Replaced" << "\n";
+                
               }
             }
             instrCnt++;
             bModified = true; 
           }
+        
         }
+      }
+
+      for (unsigned i = 0; i < instToDelete.size(); ++i) {
+        errs() << "Deleted\n";
+        instToDelete[i]->eraseFromParent();
       }
       return bModified;
     }

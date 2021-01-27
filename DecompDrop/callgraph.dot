@@ -1,0 +1,15 @@
+digraph "Call graph" {
+	label="Call graph";
+
+	Node0x263a960 [shape=record,label="{external node}"];
+	Node0x263a960 -> Node0x263aa00;
+	Node0x263a960 -> Node0x25daa70;
+	Node0x263a960 -> Node0x25daae0;
+	Node0x263a960 -> Node0x25dac10;
+	Node0x263aa00 [shape=record,label="{llvm.ctpop.i32}"];
+	Node0x25daa70 [shape=record,label="{__remill_function_call}"];
+	Node0x25daa70 -> Node0x263a990;
+	Node0x25daae0 [shape=record,label="{_init}"];
+	Node0x25daae0 -> Node0x25daa70;
+	Node0x25dac10 [shape=record,label="{llvm.returnaddress}"];
+}
