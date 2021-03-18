@@ -43,11 +43,11 @@ namespace {
           // Insert at the point where the instruction `op` appears.
           IRBuilder<> builder(op);
 
-          // op->getOperand(0)->printAsOperand(errs());
-          // errs() << "\n";
-          // op->getOperand(1)->printAsOperand(errs());
-          // errs() << "\n";
-          errs() << *op << "\n";
+          // op->getOperand(0)->printAsOperand(outs());
+          // outs() << "\n";
+          // op->getOperand(1)->printAsOperand(outs());
+          // outs() << "\n";
+          outs() << *op << "\n";
           Value *lhs = op->getOperand(0);
           Value *rhs = op->getOperand(1);
           Value *inst = builder.CreateICmpEQ(lhs, rhs);
@@ -55,9 +55,9 @@ namespace {
           // // Everywhere the old instruction was used as an operand, use our
           // // new Compare instruction instead.
           if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
-            errs() << "entered constant op1 \n";
+            outs() << "entered constant op1 \n";
             if (CI->isNullValue()) {
-              errs() << "entered null op1 \n";
+              outs() << "entered null op1 \n";
 
               for (auto &U : op->uses()) {
                 User *user = U.getUser();  // A User is anything with operands.
@@ -91,12 +91,12 @@ namespace {
           IRBuilder<> builder(op);
 
 
-          op->getOperand(0)->printAsOperand(errs());
-          errs() << "\n";
-          //errs() << op->getAlign().value() << "\n";
-          //op->getOperand(1)->printAsOperand(errs());
-          //errs() << "\n";
-          //errs() << *op << "\n";
+          op->getOperand(0)->printAsOperand(outs());
+          outs() << "\n";
+          //outs() << op->getAlign().value() << "\n";
+          //op->getOperand(1)->printAsOperand(outs());
+          //outs() << "\n";
+          //outs() << *op << "\n";
           Value *lhs = op->getOperand(0);
           //Value *rhs = op->getOperand(1);
           LLVMContext &context = F.getContext();
@@ -109,10 +109,10 @@ namespace {
           }
           bModified |= true;
         
-          op->getOperand(0)->printAsOperand(errs());
-          errs() << "\n";
+          op->getOperand(0)->printAsOperand(outs());
+          outs() << "\n";
           if(counter++ == 1){
-            errs() << "Returned early" << "\n";
+            outs() << "Returned early" << "\n";
             return bModified;
           }
           
@@ -136,11 +136,11 @@ namespace {
       for (auto &B : F) {
         
         for (auto& I : B) {
-          errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+          outs()<< I.getOpcodeName() << " " << instrCnt << "\n";
 
           instrCnt++;
           // if (auto *op = dyn_cast<CallInst>(&I)) { 
-          //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+          //   outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
           // }
         
       }
@@ -177,7 +177,7 @@ namespace {
         return inst;
       }
       else if(MutationOp == "swapFuncCall"){
-        errs() << "Begin" << "\n";
+        outs() << "Begin" << "\n";
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::vector<Value*> argList;
@@ -189,7 +189,7 @@ namespace {
         Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], argList);
         //erase from parent here
         instToDelete.push_back(I);
-        errs() << "End" << "\n";
+        outs() << "End" << "\n";
         return inst;
       }
       // func(1,2,3); replace 3 with 4?
@@ -306,7 +306,7 @@ namespace {
       bool bModified = false;
       for (auto &F : M){
         stringToFunc[F.getName()] = &F;
-        errs() << F.getName() << "\n";
+        outs() << F.getName() << "\n";
       }
 
       for (auto &F: M) {
@@ -328,27 +328,27 @@ namespace {
             // }
             
             if (instrCnt == MutationLocation) {
-              errs() << "modified: " << instrCnt;
+              outs() << "modified: " << instrCnt;
               if (isa<LoadInst>(*I)) {
-                errs() << " Load Instruction Replaced" << "\n";
+                outs() << " Load Instruction Replaced" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
                 ReplaceInstWithInst(I, altI);
               }
               else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
-                errs() << " Comparison Instruction Replaced" << "\n";
+                outs() << " Comparison Instruction Replaced" << "\n";
                 Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
                 ReplaceInstWithInst(I, altI);
               }
               else if (isa<BinaryOperator>(*I)) {
-                errs() << " Binary Operator Replaced" << "\n";
+                outs() << " Binary Operator Replaced" << "\n";
                 Instruction* altI = getRequestedMutationBinaryOp(I);
                 ReplaceInstWithInst(I, altI);
               }
               else if(auto *op = dyn_cast<CallInst>(I)) {
-                errs() << " Custom Mutation Applied" << "\n";
+                outs() << " Custom Mutation Applied" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
                 //ReplaceInstWithInst(I, altI);
-                errs() << "Instruction Replaced" << "\n";
+                outs() << "Instruction Replaced" << "\n";
                 
               }
             }
@@ -360,7 +360,7 @@ namespace {
       }
 
       for (unsigned i = 0; i < instToDelete.size(); ++i) {
-        errs() << "Deleted\n";
+        outs() << "Deleted\n";
         instToDelete[i]->eraseFromParent();
       }
       return bModified;
@@ -379,11 +379,11 @@ namespace {
 //       for (auto &B : F) {
         
 //         for (auto& I : B) {
-//           errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+//           outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 
 //           instrCnt++;
 //           // if (auto *op = dyn_cast<CallInst>(&I)) { 
-//           //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+//           //   outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 //           // }
         
 //       }
@@ -401,7 +401,6 @@ char MutatePass::ID = 3;
 static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
 static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
 static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
-// static RegisterPass<AnvillRegisterPass> Z3("anvillRegisterPass", "Fix undefined reference to null registers");
 
 
 // Automatically enable the pass.
@@ -425,10 +424,7 @@ static void registerMutatePass(const PassManagerBuilder &,
   PM.add(new MutatePass());
 }
 
-static void registerAnvillRegisterPass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {
-  PM.add(new AnvillRegisterPass());
-}
+
 
 
 static RegisterStandardPasses
