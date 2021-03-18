@@ -368,14 +368,40 @@ namespace {
   };
 }
 
+// namespace {
+//   struct AnvillLabelPass : public ModulePass {
+//     static char ID;
+//     AnvillLabelPass() : ModulePass(ID) {}
+
+//     virtual bool runOnModule(Module &M) {
+//       bool bModified = false;
+     
+//       for (auto &B : F) {
+        
+//         for (auto& I : B) {
+//           errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+
+//           instrCnt++;
+//           // if (auto *op = dyn_cast<CallInst>(&I)) { 
+//           //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+//           // }
+        
+//       }
+//     }
+//     return bModified;
+//   }
+// };
+// }
 
 char SkeletonPass::ID = 0;
 char MemoryPass::ID = 1;
 char LabelPass::ID = 2;
 char MutatePass::ID = 3;
+// char AnvillRegisterPass::ID = 4;
 static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
 static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
 static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
+// static RegisterPass<AnvillRegisterPass> Z3("anvillRegisterPass", "Fix undefined reference to null registers");
 
 
 // Automatically enable the pass.
@@ -397,6 +423,11 @@ static void registerLabelPass(const PassManagerBuilder &,
 static void registerMutatePass(const PassManagerBuilder &,
                          legacy::PassManagerBase &PM) {
   PM.add(new MutatePass());
+}
+
+static void registerAnvillRegisterPass(const PassManagerBuilder &,
+                         legacy::PassManagerBase &PM) {
+  PM.add(new AnvillRegisterPass());
 }
 
 
