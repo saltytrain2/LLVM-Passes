@@ -43,11 +43,11 @@ namespace {
           // Insert at the point where the instruction `op` appears.
           IRBuilder<> builder(op);
 
-          // op->getOperand(0)->printAsOperand(outs());
-          // outs() << "\n";
-          // op->getOperand(1)->printAsOperand(outs());
-          // outs() << "\n";
-          outs() << *op << "\n";
+          // op->getOperand(0)->printAsOperand(errs());
+          // errs() << "\n";
+          // op->getOperand(1)->printAsOperand(errs());
+          // errs() << "\n";
+          errs() << *op << "\n";
           Value *lhs = op->getOperand(0);
           Value *rhs = op->getOperand(1);
           Value *inst = builder.CreateICmpEQ(lhs, rhs);
@@ -55,9 +55,9 @@ namespace {
           // // Everywhere the old instruction was used as an operand, use our
           // // new Compare instruction instead.
           if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
-            outs() << "entered constant op1 \n";
+            errs() << "entered constant op1 \n";
             if (CI->isNullValue()) {
-              outs() << "entered null op1 \n";
+              errs() << "entered null op1 \n";
 
               for (auto &U : op->uses()) {
                 User *user = U.getUser();  // A User is anything with operands.
@@ -91,12 +91,12 @@ namespace {
           IRBuilder<> builder(op);
 
 
-          op->getOperand(0)->printAsOperand(outs());
-          outs() << "\n";
-          //outs() << op->getAlign().value() << "\n";
-          //op->getOperand(1)->printAsOperand(outs());
-          //outs() << "\n";
-          //outs() << *op << "\n";
+          op->getOperand(0)->printAsOperand(errs());
+          errs() << "\n";
+          //errs() << op->getAlign().value() << "\n";
+          //op->getOperand(1)->printAsOperand(errs());
+          //errs() << "\n";
+          //errs() << *op << "\n";
           Value *lhs = op->getOperand(0);
           //Value *rhs = op->getOperand(1);
           LLVMContext &context = F.getContext();
@@ -109,10 +109,10 @@ namespace {
           }
           bModified |= true;
         
-          op->getOperand(0)->printAsOperand(outs());
-          outs() << "\n";
+          op->getOperand(0)->printAsOperand(errs());
+          errs() << "\n";
           if(counter++ == 1){
-            outs() << "Returned early" << "\n";
+            errs() << "Returned early" << "\n";
             return bModified;
           }
           
@@ -136,11 +136,11 @@ namespace {
       for (auto &B : F) {
         
         for (auto& I : B) {
-          outs()<< I.getOpcodeName() << " " << instrCnt << "\n";
+          outs()<< I.getOpcodeName() << " " << instrCnt << "\n"; //Stay as outs
 
           instrCnt++;
           // if (auto *op = dyn_cast<CallInst>(&I)) { 
-          //   outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+          //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
           // }
         
       }
@@ -177,7 +177,7 @@ namespace {
         return inst;
       }
       else if(MutationOp == "swapFuncCall"){
-        outs() << "Begin" << "\n";
+        errs() << "Begin" << "\n";
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::vector<Value*> argList;
@@ -189,7 +189,7 @@ namespace {
         Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], argList);
         //erase from parent here
         instToDelete.push_back(I);
-        outs() << "End" << "\n";
+        errs() << "End" << "\n";
         return inst;
       }
       // func(1,2,3); replace 3 with 4?
@@ -306,7 +306,7 @@ namespace {
       bool bModified = false;
       for (auto &F : M){
         stringToFunc[F.getName()] = &F;
-        outs() << F.getName() << "\n";
+        errs() << F.getName() << "\n";
       }
 
       for (auto &F: M) {
@@ -328,27 +328,27 @@ namespace {
             // }
             
             if (instrCnt == MutationLocation) {
-              outs() << "modified: " << instrCnt;
+              errs() << "modified: " << instrCnt;
               if (isa<LoadInst>(*I)) {
-                outs() << " Load Instruction Replaced" << "\n";
+                errs() << " Load Instruction Replaced" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
                 ReplaceInstWithInst(I, altI);
               }
               else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
-                outs() << " Comparison Instruction Replaced" << "\n";
+                errs() << " Comparison Instruction Replaced" << "\n";
                 Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
                 ReplaceInstWithInst(I, altI);
               }
               else if (isa<BinaryOperator>(*I)) {
-                outs() << " Binary Operator Replaced" << "\n";
+                errs() << " Binary Operator Replaced" << "\n";
                 Instruction* altI = getRequestedMutationBinaryOp(I);
                 ReplaceInstWithInst(I, altI);
               }
               else if(auto *op = dyn_cast<CallInst>(I)) {
-                outs() << " Custom Mutation Applied" << "\n";
+                errs() << " Custom Mutation Applied" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
                 //ReplaceInstWithInst(I, altI);
-                outs() << "Instruction Replaced" << "\n";
+                errs() << "Instruction Replaced" << "\n";
                 
               }
             }
@@ -360,7 +360,7 @@ namespace {
       }
 
       for (unsigned i = 0; i < instToDelete.size(); ++i) {
-        outs() << "Deleted\n";
+        errs() << "Deleted\n";
         instToDelete[i]->eraseFromParent();
       }
       return bModified;
@@ -379,11 +379,11 @@ namespace {
 //       for (auto &B : F) {
         
 //         for (auto& I : B) {
-//           outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+//           errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 
 //           instrCnt++;
 //           // if (auto *op = dyn_cast<CallInst>(&I)) { 
-//           //   outs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+//           //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
 //           // }
         
 //       }
