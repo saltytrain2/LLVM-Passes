@@ -1,7 +1,8 @@
 
+How to use:
+python3 mutateWrappy.py {name of c file or bc file}
 
-
-
+Or to manually make mutations:
 Build:
 
     $ cd llvm-pass-skeleton
