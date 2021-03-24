@@ -1,28 +1,27 @@
 #include <stdio.h>
-int main() {
-    
+#include <stdlib.h>
+
+int main(int argc, char *argv[]) {
+
     int* global_ptr = NULL;
 
-    if(global_ptr == NULL){
-        //Code that would dereference global_ptr
-        return 1;
+    if(global_ptr == NULL){ //Vulnerability
+        *global_ptr = 4;
     }
 
-    if(global_ptr == NULL){
-        //Code that would dereference global_ptr
-        return 2;
+    if(global_ptr == NULL){ //Vulnerability
+        *global_ptr = 5;
     }
 
-    if(global_ptr == NULL){
-        //Code that would dereference global_ptr
-        return 3;
+    if(global_ptr == NULL){ //Vulnerability
+        *global_ptr = 6;
     }
     
-    if(global_ptr == NULL){
-        //Code that would dereference global_ptr
-        return 4;
+    if(global_ptr == NULL){ //Vulnerability
+        *global_ptr = 7;
     }
 
     return 0;
 }
+    
     

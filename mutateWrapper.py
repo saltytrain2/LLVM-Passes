@@ -6,6 +6,7 @@ import tempfile
 import string
 from pathlib import Path
 def main(argv):
+    #Usage enter the c file that you want to generate mutants for.
     filename = argv[0].split(".")[0]
     binop = True
 
@@ -40,6 +41,7 @@ def main(argv):
     for index, instruction_number in enumerate(instructions_to_modify):
         os.system(f"opt -load build/pass/libSkeletonPass.so -mutatePass -mutation_loc={instruction_number} -mutation_op=icmp_eq < {filename}.bc > mutants/{filename}{instruction_number}.bc")
         mutantbc.append(f"mutants/{filename}{instruction_number}.bc")
+
     for fil in mutantbc:
         newexecutable = fil.split(".")[0] 
         os.system(f"llc -filetype=obj {fil}; clang {newexecutable}.o -o {newexecutable}")
