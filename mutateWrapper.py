@@ -33,14 +33,19 @@ def main(argv):
                 # TODO: Determine which mutation you want to run and select for those opcodes
                 # Examples of binary operators, add, mult, sdiv, sub
                 print(f"Opcode: {opcode}, Linenumber: {opcode_number}")
-                if opcode == "icmp":
+                if opcode == "add":
                     instructions_to_modify.append(opcode_number)
     print(instructions_to_modify)
 
     mutantbc = []
+    mutantops = ["add", "sub", "mul", "sdiv"]
     for index, instruction_number in enumerate(instructions_to_modify):
-        os.system(f"opt -load build/pass/libSkeletonPass.so -mutatePass -mutation_loc={instruction_number} -mutation_op=icmp_eq < {filename}.bc > mutants/{filename}{instruction_number}.bc")
-        mutantbc.append(f"mutants/{filename}{instruction_number}.bc")
+        # os.system(f"opt -load build/pass/libSkeletonPass.so -mutatePass -mutation_loc={instruction_number} -mutation_op=icmp_eq < {filename}.bc > mutants/{filename}{instruction_number}.bc")
+        for mutation in mutantops:
+            os.system(f"clang -emit-llvm -o {filename}.bc -c {filename}.c")
+            os.system(f"opt -load build/pass/libSkeletonPass.so -mutatePass -mutation_loc={instruction_number} -mutation_op={mutation} < {filename}.bc > mutants/{filename}_{instruction_number}_{mutation}.bc")
+
+            mutantbc.append(f"mutants/{filename}_{instruction_number}_{mutation}.bc")
 
     for fil in mutantbc:
         newexecutable = fil.split(".")[0] 

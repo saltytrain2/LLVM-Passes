@@ -16,7 +16,7 @@ using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
 
-static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., 8:add, 15:sub, 12:mul, swapFuncCall, swapFuncParam, funcConstParam"), cl::value_desc("String"));
+static cl::opt<std::string> MutationOp("mutation_op", cl::desc("Specify operator to mutate with e.g., icmp_eq, swapFuncCall, swapFuncParam, funcConstParam"), cl::value_desc("String"));
 
 static cl::opt<std::string> MutationVal("mutation_val", cl::desc("Specify value for constant mutation (Mutation_Op flag must be funcConstParam"), cl::value_desc("String"));
 
