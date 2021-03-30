@@ -1,3 +1,4 @@
+//unpatched.c with a char overflow
 #include <stdio.h>
 #include <stdlib.h>
 

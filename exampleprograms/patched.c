@@ -1,3 +1,4 @@
+//patched.c without the char overflow
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -5,7 +6,7 @@
 int main(int argc, char *argv[]) {
 
     int input = atoi(argv[1]);
-    int overflow = 127; //-128 to 128
+    int overflow = 127; //Patched from char to int
 
     int test1 = overflow + input;
     if(test1 < 0){
