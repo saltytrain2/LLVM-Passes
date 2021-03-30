@@ -14,13 +14,15 @@ def main(argv):
     os.system(f"clang -emit-llvm -o {filename}.bc -c {filename}.c")
 
     # build the mutate pass again
+    os.makedirs("build/", exist_ok=True)
     process = subprocess.Popen("cd build; cmake ..; make",stdout=subprocess.PIPE, shell=True)
     proc_stdout = process.communicate()[0].strip()
     print(proc_stdout)
 
 
     instructions_to_modify = []
-
+    os.makedirs("exampleprograms/", exist_ok=True)
+    os.makedirs("mutants/exampleprograms/", exist_ok=True)
     with tempfile.TemporaryDirectory() as temp_dir_name:
         temp_file_path = Path(temp_dir_name) / "tempfile"
         os.system(f"clang -Xclang -load -Xclang build/pass/libSkeletonPass.so {filename}.bc > {temp_file_path}")
