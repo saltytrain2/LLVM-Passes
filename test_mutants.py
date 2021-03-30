@@ -6,6 +6,7 @@ import tempfile
 import string
 import os
 import os.path
+import pytest
 
 def test_binary_0(get_file):
     assert os.system(fr"./mutants/exampleprograms/{get_file} 0") == 0

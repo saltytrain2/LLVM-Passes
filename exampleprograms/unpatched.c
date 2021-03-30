@@ -6,11 +6,10 @@ int main(int argc, char *argv[]) {
 
     int input = atoi(argv[1]);
     char overflow = 127; //-128 to 128
-    int overflowwrapper = 127;
 
 
     char test1 = overflow + input;
-    if(overflow < 0){
+    if(test1 < 0){
         return -1; //We overflowed return -1 to indicate a failure
     }
 
