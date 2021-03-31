@@ -2,6 +2,9 @@
 How to use:
 python3 mutateWrappy.py {name of c file or bc file}
 
+Then to test:
+python3 -m pytest --file {name of executable found in mutants/exampleprograms/}
+
 Or to manually make mutations:
 Build:
 
