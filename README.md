@@ -1,6 +1,15 @@
 
-How to use:
-python3 mutateWrappy.py {name of c file or bc file}
+How to use wrapper script to generate mutatns and test them against a test suite:
+Expected Usage : python3 mutateWrapper.py <filename relative path> <test suite marker> <opcode to modify> <category>
+<opcode to modify> must be a llvm opcode
+<category must be one of the following: "binop", "icmp"
+Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit add binop 
+Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit icmp icmp 
+
+To add a new test suite: 
+Edit the pytest.ini file with a new marker called {marker}, and then create a pytest file called "test_{filename}.py" and 
+mark test functions with @pytest.mark.{marker}.
+
 
 Or to manually make mutations:
 Build:
@@ -29,4 +38,3 @@ Run:
     4. Create object file from edited bc file: llc -filetype=obj functioncallnew.bc
     5. Create executable: clang functioncallnew.o
     6. Run executable: ./a.out
-
