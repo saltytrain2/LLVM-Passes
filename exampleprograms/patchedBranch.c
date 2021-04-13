@@ -1,26 +1,28 @@
-//patched.c without the char overflow
+//patchedBranch.c - If statements accurately reflect print statements.
 #include <stdio.h>
 #include <stdlib.h>
 
-//Program only takes in positive numbers between 0-9
+//Program takes in no input. We will rely output from printf to "evaluate" this file
 int main() {
-    int original = 0
+    int original = 0;
 
     if(original > 1){
-        return -1; //We overflowed return -1 to indicate a failure
+        printf("Entered first if statement, condition was `original > 1`\n");
     }
 
     if(original != 0){
-        return -1;
+        printf("Entered second if statement, condition was `original != 1`\n");
     }
 
-    if(!(original == 0)){
-        return -1;
+    if(!(original >= 1)){
+        printf("Entered third if statement condition was `original >= 1`\n");
     }
 
-    if(original )
+    if(original == 0){
+        printf("Entered fourth if statement condition was `original == 0`\n");
+    }
 
-    return 0; //Return 0 == pass
+    return 0;
 }
     
     

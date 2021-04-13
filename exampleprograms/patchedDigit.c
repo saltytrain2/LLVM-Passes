@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-//Program only takes in positive numbers between 0-9
+//Testcase Digit tests numbers between 0-9
 int main(int argc, char *argv[]) {
 
     int input = atoi(argv[1]);
