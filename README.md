@@ -11,6 +11,9 @@ Edit the pytest.ini file with a new marker called {marker}, and then create a py
 mark test functions with @pytest.mark.{marker}.
 
 
+Then to test:
+python3 -m pytest --file {name of executable found in mutants/exampleprograms/}
+
 Or to manually make mutations:
 Build:
 
