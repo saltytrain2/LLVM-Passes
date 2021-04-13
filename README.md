@@ -3,8 +3,8 @@ How to use wrapper script to generate mutatns and test them against a test suite
 Expected Usage : python3 mutateWrapper.py <filename relative path> <test suite marker> <opcode to modify> <category>
 <opcode to modify> must be a llvm opcode
 <category must be one of the following: "binop", "icmp"
-Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit add binop 
-Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit icmp icmp 
+Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit add binop 
+Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit icmp icmp 
 
 To add a new test suite: 
 Edit the pytest.ini file with a new marker called {marker}, and then create a pytest file called "test_{filename}.py" and 

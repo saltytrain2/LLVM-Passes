@@ -9,8 +9,8 @@ def main(argv):
     #Expected Usage : python3 mutateWrapper.py <filename relative path> <test suite marker> <opcode to modify> <category>
     #<opcode to modify> must be a llvm opcode
     #<category must be one of the following: "binop", "icmp"
-    #Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit add binop 
-    #Example Usage: python3 mutateWrapper.py exampleprograms/patched.c digit icmp icmp 
+    #Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit add binop 
+    #Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit icmp icmp 
     filename = argv[0].split(".")[0]
     testsuite = argv[1]
     opcode_to_search = argv[2]
