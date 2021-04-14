@@ -48,6 +48,18 @@ def test_binary_8(get_file):
 def test_binary_9(get_file):
     assert os.system(fr"{get_file} 9") == 0
 
+@pytest.mark.digit
+def test_binary_LargeInt(get_file):
+    assert os.system(fr"{get_file} 21474836") == 0
+    
+@pytest.mark.digit
+def test_binary_INT_MAX(get_file):
+    assert os.system(fr"{get_file} 2147483647") == 0
+
+@pytest.mark.digit
+def test_binary_LONGINT_MAX(get_file):
+    assert os.system(fr"{get_file} 9,223,372,036,854,775,807") == 0
+
 @pytest.fixture()
 def get_file(request):
     return request.config.getoption("--file")
