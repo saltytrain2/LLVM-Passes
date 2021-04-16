@@ -5,6 +5,8 @@ Expected Usage : python3 mutateWrapper.py <filename relative path> <test suite m
 <category must be one of the following: "binop", "icmp"
 Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit add binop 
 Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit icmp icmp 
+Example Usage: python3 mutateWrapper.py exampleprograms/unpatchedDigit.c digit icmp icmp 
+
 
 To add a new test suite: 
 Edit the pytest.ini file with a new marker called {marker}, and then create a pytest file called "test_{filename}.py" and 
