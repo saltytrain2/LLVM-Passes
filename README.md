@@ -1,5 +1,5 @@
 
-Dependencies required for the wrapper script: LLVM 9+, opt, llc, pytest
+Dependencies required for the wrapper script: CMake 3.16+, LLVM 9+, opt, llc, pytest
 
 How to use wrapper script to generate mutants and test them against a test suite:
 Expected Usage : python3 mutateWrapper.py \<filename relative path\> \<test suite marker\> \<opcode to modify\> \<category\>
