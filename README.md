@@ -9,6 +9,10 @@ Expected Usage : python3 mutateWrapper.py \<filename relative path\> \<test suit
 \<category\> must be one of the following: "binop", "icmp"
           
 Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit add binop 
+
+Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit2.c digit add binop 
+
+Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit3.c digit add binop 
           
 Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit icmp icmp 
 
