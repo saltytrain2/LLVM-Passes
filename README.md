@@ -1,10 +1,12 @@
 
+Dependencies required for the wrapper script: LLVM 9+, opt, llc, pytest
+
 How to use wrapper script to generate mutants and test them against a test suite:
-Expected Usage : python3 mutateWrapper.py <filename relative path> <test suite marker> <opcode to modify> <category>
+Expected Usage : python3 mutateWrapper.py \<filename relative path\> \<test suite marker\> \<opcode to modify\> \<category\>
     
-<opcode to modify> must be a llvm opcode
+\<opcode to modify\> must be a llvm opcode
     
-<category must be one of the following: "binop", "icmp"
+\<category\> must be one of the following: "binop", "icmp"
           
 Example Usage: python3 mutateWrapper.py exampleprograms/patchedDigit.c digit add binop 
           
