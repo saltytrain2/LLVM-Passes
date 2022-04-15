@@ -1,5 +1,7 @@
 #include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/InstrTypes.h"
@@ -8,10 +10,12 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <string>
 using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
@@ -24,137 +28,184 @@ static cl::opt<unsigned> ParameterLocation("parameter_loc", cl::desc("Specify th
 
 static cl::opt<std::string> FunctionName("function_name", cl::desc("Specify name of the function to swap to (Mutation_Op flag must be swapFuncCall"), cl::value_desc("String"));
 
+static cl::opt<std::string> OutputFile("output_file", cl::desc("Output filename."), cl::value_desc("String"));
+
+static cl::opt<std::string> SwapParamNums("swap_param_nums", cl::desc("Specify the position of the two parameters to swap (Mutation_op flag must be swapFuncParam)"), cl::value_desc("String"));
+
+
 std::unordered_map<std::string, Function*> stringToFunc;
 std::vector<Instruction*> instToDelete;
 
 
 namespace {
-  struct SkeletonPass : public FunctionPass {
-    static char ID;
-    SkeletonPass() : FunctionPass(ID) {}
+  struct SkeletonPass : public PassInfoMixin<SkeletonPass> {
+    PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
+      bool Changed = runOnFunction(F);
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
 
-    virtual bool runOnFunction(Function &F) {
+    bool runOnFunction(Function& F) {
       bool bModified = false;
       for (auto &B : F) {
         for (auto& I : B) {
-       
 
-        if (auto *op = dyn_cast<ICmpInst>(&I)) {
-          // Insert at the point where the instruction `op` appears.
-          IRBuilder<> builder(op);
+          if (auto *op = dyn_cast<ICmpInst>(&I)) {
+            // Insert at the point where the instruction `op` appears.
+            IRBuilder<> builder(op);
 
-          // op->getOperand(0)->printAsOperand(errs());
-          // errs() << "\n";
-          // op->getOperand(1)->printAsOperand(errs());
-          // errs() << "\n";
-          errs() << *op << "\n";
-          Value *lhs = op->getOperand(0);
-          Value *rhs = op->getOperand(1);
-          Value *inst = builder.CreateICmpEQ(lhs, rhs);
+            // op->getOperand(0)->printAsOperand(errs());
+            // errs() << "\n";
+            // op->getOperand(1)->printAsOperand(errs());
+            // errs() << "\n";
+            errs() << *op << "\n";
+            Value *lhs = op->getOperand(0);
+            Value *rhs = op->getOperand(1);
+            Value *inst = builder.CreateICmpEQ(lhs, rhs);
 
-          // // Everywhere the old instruction was used as an operand, use our
-          // // new Compare instruction instead.
-          if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
-            errs() << "entered constant op1 \n";
-            if (CI->isNullValue()) {
-              errs() << "entered null op1 \n";
+            // // Everywhere the old instruction was used as an operand, use our
+            // // new Compare instruction instead.
+            if (llvm::Constant* CI = dyn_cast<llvm::Constant>(op->getOperand(1))) {
+              errs() << "entered constant op1 \n";
+              if (CI->isNullValue()) {
+                errs() << "entered null op1 \n";
 
-              for (auto &U : op->uses()) {
-                User *user = U.getUser();  // A User is anything with operands.
-                user->setOperand(U.getOperandNo(), inst);
+                for (auto &U : op->uses()) {
+                  User *user = U.getUser();  // A User is anything with operands.
+                  user->setOperand(U.getOperandNo(), inst);
+                }
+                bModified |= true;
               }
-              bModified |= true;
             }
           }
-        }
         }
       }
       return bModified;
     }
+
+    static bool isRequired() { return true; }
   };
 }
 
 
 namespace {
-  struct MemoryPass : public FunctionPass {
-    static char ID;
-    MemoryPass() : FunctionPass(ID) {}
+  struct MemoryPass : public PassInfoMixin<MemoryPass> {
+    PreservedAnalyses run(Function& F, FunctionAnalysisManager &) {
+      bool Changed = runOnFunction(F);
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
 
-    virtual bool runOnFunction(Function &F) {
+    bool runOnFunction(Function& F) {
       bool bModified = false;
       int counter = 0;
       for (auto &B : F) {
         for (auto& I : B) {
-        if (auto *op = dyn_cast<LoadInst>(&I)) {
-          //getAlign() Return the alignment of the memory that is being allocated by the instruction. More...
-          // Insert at the point where the instruction `op` appears.
-          IRBuilder<> builder(op);
+          if (auto *op = dyn_cast<LoadInst>(&I)) {
+            //getAlign() Return the alignment of the memory that is being allocated by the instruction. More...
+            // Insert at the point where the instruction `op` appears.
+            IRBuilder<> builder(op);
 
 
-          op->getOperand(0)->printAsOperand(errs());
-          errs() << "\n";
-          //errs() << op->getAlign().value() << "\n";
-          //op->getOperand(1)->printAsOperand(errs());
-          //errs() << "\n";
-          //errs() << *op << "\n";
-          Value *lhs = op->getOperand(0);
-          //Value *rhs = op->getOperand(1);
-          LLVMContext &context = F.getContext();
-          Type* type = Type::getInt8Ty(context);
-          Value *inst = builder.CreateLoad(type, lhs);
+            op->getOperand(0)->printAsOperand(errs());
+            errs() << "\n";
+            //errs() << op->getAlign().value() << "\n";
+            //op->getOperand(1)->printAsOperand(errs());
+            //errs() << "\n";
+            //errs() << *op << "\n";
+            Value *lhs = op->getOperand(0);
+            //Value *rhs = op->getOperand(1);
+            LLVMContext &context = F.getContext();
+            Type* type = Type::getInt8Ty(context);
+            Value *inst = builder.CreateLoad(type, lhs);
           
-          for (auto &U : op->uses()) {
-            User *user = U.getUser();  // A User is anything with operands.
-            user->setOperand(U.getOperandNo(), inst);
-          }
-          bModified |= true;
+            for (auto &U : op->uses()) {
+              User *user = U.getUser();  // A User is anything with operands.
+              user->setOperand(U.getOperandNo(), inst);
+            }
+            bModified |= true;
         
-          op->getOperand(0)->printAsOperand(errs());
-          errs() << "\n";
-          if(counter++ == 1){
-            errs() << "Returned early" << "\n";
-            return bModified;
+            op->getOperand(0)->printAsOperand(errs());
+            errs() << "\n";
+            if(counter++ == 1){
+              errs() << "Returned early" << "\n";
+              return bModified;
+            }
           }
-          
         }
       }
+      return bModified;
     }
-    return bModified;
-  }
-};
+    static bool isRequired() { return true; }
+  };
 }
 
 int instrCnt = 0;
 namespace {
-  struct LabelPass : public FunctionPass {
-    static char ID;
-    LabelPass() : FunctionPass(ID) {}
+  struct LabelPass : public PassInfoMixin<LabelPass> {
+    std::ofstream mystream;
 
-    virtual bool runOnFunction(Function &F) {
-      bool bModified = false;
-     
-      for (auto &B : F) {
-        
-        for (auto& I : B) {
-          outs()<< I.getOpcodeName() << " " << instrCnt << "\n"; //Stay as outs
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager &) {
+      mystream.open(OutputFile, std::ios::out);
 
-          instrCnt++;
-          // if (auto *op = dyn_cast<CallInst>(&I)) { 
-          //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
-          // }
-        
-      }
+      bool changed = runOnModule(M);
+      return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
-    return bModified;
-  }
-};
+
+    bool runOnModule(Module& M) {
+      bool isModified = false;
+
+      for (auto &F : M) {
+        if (F.isDeclaration())
+          continue;
+
+        mystream << std::string(F.getName()) << "\n";
+        for (inst_iterator i = inst_begin(F); i != inst_end(F); ++i) {
+          mystream << i->getOpcodeName() << " " << instrCnt << "\n";
+          outs() << i->getOpcodeName() << " " << instrCnt << "\n";
+
+          ++instrCnt;
+          if (auto *op = dyn_cast<CallInst>(&*i)) {
+            errs() << "instr #: " << instrCnt << " opcode: " << i->getOpcodeName() << "\n";
+          }
+        }
+        mystream << "\n";
+      }
+
+      return isModified;
+    }
+
+    // bool runOnFunction(Function &F) {
+    //   bool bModified = false;
+     
+    //   for (auto &B : F) {
+        
+    //     for (auto& I : B) {
+
+	   
+    //       this->mystream<< I.getOpcodeName() << " " << instrCnt << "\n"; //Stay as outs
+    //      // outs()<< I.getOpcodeName() << " " << instrCnt << "\n"; //Stay as outs
+
+	  
+
+    //       instrCnt++;
+    //       // if (auto *op = dyn_cast<CallInst>(&I)) { 
+    //       //   errs()<< "instr #: " << (instrCnt) << " opcode: " << I.getOpcodeName() << "\n";
+    //       // }
+        
+    //     }
+    //   }
+    //   return bModified;
+    // }
+    static bool isRequired() { return true; }
+  };
 }
 
 
 namespace {
-  struct MutatePass : public ModulePass {
-    static char ID;
-    MutatePass() : ModulePass(ID) {}
+  struct MutatePass : public PassInfoMixin<MutatePass> {
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager &) {
+      bool Changed = runOnModule(M);
+      return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
 
     Instruction* getRequestSpecialOp(Instruction* I) {
       if(MutationOp == "loadint8"){
@@ -166,16 +217,27 @@ namespace {
         
         return inst;
       }
-      else if(MutationOp == "swapFuncParam"){ //TODO - update to work w/ arg list.
+
+      else if(MutationOp == "swapFuncParam"){ //TODO - make this function more robust for type-implicit conversions
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
-        Value *func = op->getCalledFunction();
-        Value *arg1 = op->getArgOperand(0);
-        Value *arg2 = op->getArgOperand(1);
-        Value *newArgs[] = {arg2, arg1};
+        std::stringstream paramIndices(SwapParamNums); // populates stringstream with two indices values
+        std::vector<Value*> newArgs;
+
+        // extract the two indices
+        int firstIndex, secondIndex;
+        paramIndices >> firstIndex;
+        paramIndices >> secondIndex;
+
+        for (uint32_t i = 0; i < op->getNumArgOperands(); ++i) {
+          newArgs.push_back(op->getArgOperand(i));
+        }
+
+        std::swap(newArgs[firstIndex], newArgs[secondIndex]);
         Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
         return inst;
       }
+
       else if(MutationOp == "swapFuncCall"){
         errs() << "Begin" << "\n";
         auto *op = dyn_cast<CallInst>(I);
@@ -302,10 +364,10 @@ namespace {
       
     }
 
-    virtual bool runOnModule(Module &M) {
+    bool runOnModule(Module &M) {
       bool bModified = false;
-      for (auto &F : M){
-        stringToFunc[F.getName()] = &F;
+      for (auto &F : M) {
+        stringToFunc[std::string(F.getName())] = &F;
         errs() << F.getName() << "\n";
       }
 
@@ -347,7 +409,7 @@ namespace {
               else if(auto *op = dyn_cast<CallInst>(I)) {
                 errs() << " Custom Mutation Applied" << "\n";
                 Instruction* altI = getRequestSpecialOp(I);
-                //ReplaceInstWithInst(I, altI);
+                ReplaceInstWithInst(I, altI);
                 errs() << "Instruction Replaced" << "\n";
                 
               }
@@ -365,6 +427,8 @@ namespace {
       }
       return bModified;
     }
+
+    static bool isRequired() { return true; }
   };
 }
 
@@ -393,40 +457,76 @@ namespace {
 // };
 // }
 
-char SkeletonPass::ID = 0;
-char MemoryPass::ID = 1;
-char LabelPass::ID = 2;
-char MutatePass::ID = 3;
-// char AnvillRegisterPass::ID = 4;
-static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
-static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
-static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
-
-
-// Automatically enable the pass.
-static void registerSkeletonPass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {
-  PM.add(new SkeletonPass());
+llvm::PassPluginLibraryInfo getSkeletonPassPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "skeleton-pass", LLVM_VERSION_STRING,
+          [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, FunctionPassManager &FPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "skeleton-pass") {
+                    FPM.addPass(SkeletonPass());
+                    return true;
+                  } else if (Name == "memory-pass") {
+                    FPM.addPass(MemoryPass());
+                    return true;
+                  }
+                  return false;
+                });
+            PB.registerPipelineParsingCallback(
+              [](StringRef Name, ModulePassManager& MPM,
+                 ArrayRef<PassBuilder::PipelineElement>) {
+                   if (Name == "mutate-pass") {
+                     MPM.addPass(MutatePass());
+                     return true;
+                   } else if (Name == "label-pass") {
+                     MPM.addPass(LabelPass());
+                     return true;
+                   }
+                   return false;
+                });
+          }};
 }
 
-static void registerMemoryPass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {
-  PM.add(new MemoryPass());
-}
-
-static void registerLabelPass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {
-  PM.add(new LabelPass());
-}
-
-static void registerMutatePass(const PassManagerBuilder &,
-                         legacy::PassManagerBase &PM) {
-  PM.add(new MutatePass());
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+  return getSkeletonPassPluginInfo();
 }
 
 
+// char SkeletonPass::ID = 0;
+// char MemoryPass::ID = 1;
+// char LabelPass::ID = 2;
+// char MutatePass::ID = 3;
+// // char AnvillRegisterPass::ID = 4;
+// static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
+// static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
+// static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
 
 
-static RegisterStandardPasses
-  RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-                 registerLabelPass);
+// // Automatically enable the pass.
+// static void registerSkeletonPass(const PassManagerBuilder &,
+//                          legacy::PassManagerBase &PM) {
+//   PM.add(new SkeletonPass());
+// }
+
+// static void registerMemoryPass(const PassManagerBuilder &,
+//                          legacy::PassManagerBase &PM) {
+//   PM.add(new MemoryPass());
+// }
+
+// static void registerLabelPass(const PassManagerBuilder &,
+//                          legacy::PassManagerBase &PM) {
+//   PM.add(new LabelPass());
+// }
+
+// static void registerMutatePass(const PassManagerBuilder &,
+//                          legacy::PassManagerBase &PM) {
+//   PM.add(new MutatePass());
+// }
+
+
+
+
+// static RegisterStandardPasses
+//   RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
+//                  registerLabelPass);

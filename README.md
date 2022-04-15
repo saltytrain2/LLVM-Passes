@@ -49,8 +49,8 @@ Run:
     _________________________________
     To run mutate passes:
     1. Emit bc file from source: clang -emit-llvm -o example.bc -c example.c
-    2. Find instruction number using labelPass: clang -Xclang -load -Xclang build/pass/libSkeletonPass.* example.c
-    3. Specify instruction location to mutate and mutation operand type and run the mutate pass on bc file: opt -load build/pass/libSkeletonPass.so -mutatePass -mutation_loc=33 -mutation_op=swapplus1toplus2 < functioncall.bc > functioncallnew.bc
-    4. Create object file from edited bc file: llc -filetype=obj functioncallnew.bc
-    5. Create executable: clang functioncallnew.o
+    2. Find instruction number using labelPass: opt -load <path/to/libSkeletonPass.so> -output_file=<file_name> -load-pass-plugin <path/to/libSkeletonPass.so> -passes="label-pass" example.bc -o example.bc
+    3. Specify instruction location to mutate and mutation operand type and run the mutate pass on bc file: opt -load <path/to/libSkeletonPass.so> -mutation_loc=<line_number> -mutation_op=<new_operation> -load-pass-plugin <path/to/libSkeletonPass.so> -passes="mutate-pass" example.bc -o example.bc
+    4. Create object file from edited bc file: llc -filetype=obj example.bc
+    5. Create executable: clang example.o
     6. Run executable: ./a.out
