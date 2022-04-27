@@ -30,7 +30,7 @@ static cl::opt<std::string> FunctionName("function_name", cl::desc("Specify name
 
 static cl::opt<std::string> OutputFile("output_file", cl::desc("Output filename."), cl::value_desc("String"));
 
-static cl::opt<std::string> SwapParamNums("swap_param_nums", cl::desc("Specify the position of the two parameters to swap (Mutation_op flag must be swapFuncParam)"), cl::value_desc("String"));
+static cl::opt<std::string> SwapParamNums("swap_param_nums", cl::desc("Specify the position of the two parameters to swap (Mutation_op flag must be swapFuncParam, declared as 'num1 num2')"), cl::value_desc("String"));
 
 
 std::unordered_map<std::string, Function*> stringToFunc;
@@ -218,7 +218,7 @@ namespace {
         return inst;
       }
 
-      else if(MutationOp == "swapFuncParam"){ //TODO - make this function more robust for type-implicit conversions
+      else if(MutationOp == "swapFuncParam") { //TODO - make this function more robust for type-implicit conversions
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::stringstream paramIndices(SwapParamNums); // populates stringstream with two indices values
@@ -233,7 +233,21 @@ namespace {
           newArgs.push_back(op->getArgOperand(i));
         }
 
-        std::swap(newArgs[firstIndex], newArgs[secondIndex]);
+        llvm::Value* firstParam = newArgs[firstIndex];
+        llvm::Value* secondParam = newArgs[secondIndex];
+
+        if (firstParam->getType() == secondParam->getType()) {
+          std::swap(firstParam, secondParam);
+        } else {
+          auto firstCast = getTypeCast(builder, firstParam, secondParam);
+          // if a type conversion is not supported, do not replace any instructions
+          if (firstCast == nullptr) {
+            return nullptr;
+          }
+          auto secondCast = getTypeCast(builder, secondParam, firstParam);
+          std::swap(newArgs[firstIndex], secondCast);
+          std::swap(newArgs[secondIndex], firstCast);
+        }
         Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
         return inst;
       }
@@ -280,6 +294,26 @@ namespace {
       return nullptr;
     }
     
+    Value* getTypeCast(IRBuilder<>& builder, llvm::Value* firstParam, llvm::Value* secondParam) {
+      // begin a series of statements to determine the types of the parameters to generate the correct IRBuilder cast call
+      // TODO, all references to integers are assumed to be unsigned, have to distinguish since llvm makes no explicit distinctions between signed and unsigned ints
+      if (firstParam->getType()->isIntegerTy() && secondParam->getType()->isFloatingPointTy()) {
+        return builder.CreateUIToFP(firstParam, secondParam->getType());
+      } else if (firstParam->getType()->isFloatingPointTy() && secondParam->getType()->isIntegerTy()) {
+        return builder.CreateFPToUI(firstParam, secondParam->getType());
+      } else if (firstParam->getType()->isPointerTy() && secondParam->getType()->isIntegerTy()) {
+        return builder.CreatePtrToInt(firstParam, secondParam->getType());
+      } else if (firstParam->getType()->isIntegerTy() && secondParam->getType()->isPointerTy()) {
+        return builder.CreateIntToPtr(firstParam, secondParam->getType());
+      } else if (firstParam->getType()->isIntegerTy() && secondParam->getType()->isIntegerTy()) {
+        return builder.CreateSExtOrTrunc(firstParam, secondParam->getType());
+      } else if (firstParam->getType()->isPointerTy() && secondParam->getType()->isPointerTy()) {
+        return builder.CreateBitOrPointerCast(firstParam, secondParam->getType());
+      } else {
+        return nullptr;
+      }
+    }
+
     Instruction* getRequestedMutationBinaryOp(Instruction* I) {
       if(MutationOp == "add"){
         return BinaryOperator::Create(Instruction::Add, I->getOperand(0), I->getOperand(1), "optimute");
@@ -361,7 +395,6 @@ namespace {
         return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_SLE, I->getOperand(0), I->getOperand(1), "optimute");
       }
       return nullptr;
-      
     }
 
     bool runOnModule(Module &M) {
@@ -491,42 +524,3 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
   return getSkeletonPassPluginInfo();
 }
-
-
-// char SkeletonPass::ID = 0;
-// char MemoryPass::ID = 1;
-// char LabelPass::ID = 2;
-// char MutatePass::ID = 3;
-// // char AnvillRegisterPass::ID = 4;
-// static RegisterPass<MutatePass> X("mutatePass", "Apply Replacement Mutation");
-// static RegisterPass<LabelPass> Z("labelPass", "Print Labels");
-// static RegisterPass<MemoryPass> Z2("memoryPass", "Print Labels");
-
-
-// // Automatically enable the pass.
-// static void registerSkeletonPass(const PassManagerBuilder &,
-//                          legacy::PassManagerBase &PM) {
-//   PM.add(new SkeletonPass());
-// }
-
-// static void registerMemoryPass(const PassManagerBuilder &,
-//                          legacy::PassManagerBase &PM) {
-//   PM.add(new MemoryPass());
-// }
-
-// static void registerLabelPass(const PassManagerBuilder &,
-//                          legacy::PassManagerBase &PM) {
-//   PM.add(new LabelPass());
-// }
-
-// static void registerMutatePass(const PassManagerBuilder &,
-//                          legacy::PassManagerBase &PM) {
-//   PM.add(new MutatePass());
-// }
-
-
-
-
-// static RegisterStandardPasses
-//   RegisterMyPass(PassManagerBuilder::EP_EarlyAsPossible,
-//                  registerLabelPass);
