@@ -33,7 +33,7 @@ Build:
     $ cd llvm-pass-skeleton
     $ mkdir build
     $ cd build
-    $ cmake ..
+    $ cmake -DLT_LLVM_INSTALL_DIR=$LLVM_DIR ../
     $ make
     $ cd ..
 

@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <iostream>
 using namespace llvm;
 
 static cl::opt<unsigned> MutationLocation("mutation_loc", cl::desc("Specify the instruction number that you would like to mutate"), cl::value_desc("unsigned integer"));
@@ -207,7 +208,7 @@ namespace {
       return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
 
-    Instruction* getRequestSpecialOp(Instruction* I) {
+    Instruction* getRequestCallOp(Instruction* I) {
       if(MutationOp == "loadint8"){
         auto *op = dyn_cast<LoadInst>(I);
         IRBuilder<> builder(op);
@@ -294,6 +295,39 @@ namespace {
       return nullptr;
     }
     
+    bool getRequestedBranchOp(Instruction* I) {
+      if (MutationOp == "removeElseBlock") {
+        auto* op = dyn_cast<BranchInst>(I);
+        IRBuilder<> builder(op);
+        // check to make sure the current branch inst is actually an if-else block
+        if (!op->isConditional() || op->getNumSuccessors() != 2) {
+          errs() << "nop\n";
+          return false;
+        }
+
+        Value* condValue = op->getCondition();
+        BasicBlock* thenBlock = op->getSuccessor(0);
+        BasicBlock* elseBlock = op->getSuccessor(1);
+        BasicBlock* thenBlockSuccessor = thenBlock->getUniqueSuccessor();
+        BasicBlock* elseBlockSuccessor = elseBlock->getUniqueSuccessor();
+        BasicBlock* thenBlockPredecessor = thenBlock->getUniquePredecessor();
+        BasicBlock* elseBlockPredecessor = elseBlock->getUniquePredecessor();
+
+        // check to make sure the if-else block has no nested blocks
+        if (thenBlockSuccessor != elseBlockSuccessor || thenBlockPredecessor != elseBlockPredecessor ||
+            thenBlockSuccessor == nullptr || thenBlockPredecessor == nullptr) {
+          errs() << "nop\n";
+          return false;
+        }
+
+        Instruction* inst = builder.CreateCondBr(condValue, thenBlock, thenBlockSuccessor);
+        I->eraseFromParent();
+        DeleteDeadBlock(elseBlock);
+        return true;
+      }
+      return false;
+    }
+
     Value* getTypeCast(IRBuilder<>& builder, llvm::Value* firstParam, llvm::Value* secondParam) {
       // begin a series of statements to determine the types of the parameters to generate the correct IRBuilder cast call
       // TODO, all references to integers are assumed to be unsigned, have to distinguish since llvm makes no explicit distinctions between signed and unsigned ints
@@ -363,7 +397,8 @@ namespace {
       return nullptr; //User didn't specify a valid mutationop  
     }
 
-    Instruction* getRequestedMutantIcmpInst(Instruction* I, ICmpInst* cmpInst) {
+    Instruction* getRequestedMutantIcmpInst(Instruction* I) {
+      ICmpInst* cmpInst = dyn_cast<ICmpInst>(I);
       if (MutationOp == "icmp_eq") {
         return CmpInst::Create(cmpInst->getOpcode(), CmpInst::ICMP_EQ, I->getOperand(0), I->getOperand(1), "optimute");
       }
@@ -405,7 +440,6 @@ namespace {
       }
 
       for (auto &F: M) {
-        
         for (auto &B : F) {
           for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
             Instruction *I = &*DI++;
@@ -426,12 +460,12 @@ namespace {
               errs() << "modified: " << instrCnt;
               if (isa<LoadInst>(*I)) {
                 errs() << " Load Instruction Replaced" << "\n";
-                Instruction* altI = getRequestSpecialOp(I);
+                Instruction* altI = getRequestCallOp(I);
                 ReplaceInstWithInst(I, altI);
               }
-              else if (ICmpInst *cmpInst = dyn_cast<ICmpInst>(I)) {
+              else if (isa<ICmpInst>(I)) {
                 errs() << " Comparison Instruction Replaced" << "\n";
-                Instruction *altI = getRequestedMutantIcmpInst(I, cmpInst);
+                Instruction *altI = getRequestedMutantIcmpInst(I);
                 ReplaceInstWithInst(I, altI);
               }
               else if (isa<BinaryOperator>(*I)) {
@@ -439,12 +473,17 @@ namespace {
                 Instruction* altI = getRequestedMutationBinaryOp(I);
                 ReplaceInstWithInst(I, altI);
               }
-              else if(auto *op = dyn_cast<CallInst>(I)) {
-                errs() << " Custom Mutation Applied" << "\n";
-                Instruction* altI = getRequestSpecialOp(I);
+              else if(isa<CallInst>(I)) {
+                errs() << " Custom Call Mutation Applied" << "\n";
+                Instruction* altI = getRequestCallOp(I);
                 ReplaceInstWithInst(I, altI);
                 errs() << "Instruction Replaced" << "\n";
-                
+              }
+              else if (isa<BranchInst>(I)) {
+                errs() << "Custom Branch Mutation Applied\n";
+                if (!getRequestedBranchOp(I)) {
+                  errs() << "no else block detected\n";
+                }
               }
             }
             instrCnt++;
