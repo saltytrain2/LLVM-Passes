@@ -10,6 +10,10 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Intrinsics.h"
+
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -32,6 +36,8 @@ static cl::opt<std::string> FunctionName("function_name", cl::desc("Specify name
 static cl::opt<std::string> OutputFile("output_file", cl::desc("Output filename."), cl::value_desc("String"));
 
 static cl::opt<std::string> SwapParamNums("swap_param_nums", cl::desc("Specify the position of the two parameters to swap (Mutation_op flag must be swapFuncParam, declared as 'num1 num2')"), cl::value_desc("String"));
+
+static cl::opt<std::string> HashAlgorithm("hash_algorithm", cl::desc("Specify the hashing algorithm to implement (Mutation_op flag must be changeHash)"), cl::value_desc("String"));
 
 
 std::unordered_map<std::string, Function*> stringToFunc;
@@ -139,7 +145,6 @@ namespace {
   };
 }
 
-int instrCnt = 0;
 namespace {
   struct LabelPass : public PassInfoMixin<LabelPass> {
     std::ofstream mystream;
@@ -153,24 +158,41 @@ namespace {
 
     bool runOnModule(Module& M) {
       bool isModified = false;
+      uint64_t instrCnt = 0;
 
       for (auto &F : M) {
         if (F.isDeclaration())
           continue;
 
-        mystream << std::string(F.getName()) << "\n";
+        mystream << F.getName().str() << "\n";
+        outs() << F.getName() << "\n";
+
         for (inst_iterator i = inst_begin(F); i != inst_end(F); ++i) {
-          mystream << i->getOpcodeName() << " " << instrCnt << "\n";
-          outs() << i->getOpcodeName() << " " << instrCnt << "\n";
+          mystream << instrCnt << " " << i->getOpcodeName() << " ";
+          outs() << instrCnt << " " << i->getOpcodeName() << " ";
+          if (isa<CallInst>(&*i)) {
+            CallInst* op = dyn_cast<CallInst>(&*i);
+            if (op->getCalledFunction() != nullptr) {
+              mystream << op->getCalledFunction()->getName().str() << ' ' << op->getNumArgOperands() << '\n';
+              outs() << op->getCalledFunction()->getName() << ' ' << op->getNumArgOperands() << '\n';
+            } else {
+              mystream << "indirect " << op->getNumOperands() << '\n';
+              outs() << "indirect " << op->getNumOperands() << '\n';
+            }
+          } else if (isa<GetElementPtrInst>(&*i)) {
+            GetElementPtrInst* op = dyn_cast<GetElementPtrInst>(&*i);
+            mystream << op->getNumIndices() << '\n';
+            outs() << op->getNumIndices() << '\n';
+          } else {
+            mystream << '\n';
+            outs() << '\n';
+          }
 
           ++instrCnt;
-          if (auto *op = dyn_cast<CallInst>(&*i)) {
-            errs() << "instr #: " << instrCnt << " opcode: " << i->getOpcodeName() << "\n";
-          }
         }
         mystream << "\n";
+        outs() << "\n";
       }
-
       return isModified;
     }
 
@@ -208,7 +230,7 @@ namespace {
       return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
     }
 
-    Instruction* getRequestCallOp(Instruction* I) {
+    Instruction* getRequestCallOp(Instruction* I, Module& M) {
       if(MutationOp == "loadint8"){
         auto *op = dyn_cast<LoadInst>(I);
         IRBuilder<> builder(op);
@@ -217,13 +239,16 @@ namespace {
         Instruction *inst = builder.CreateLoad(type, op->getOperand(0));
         
         return inst;
-      }
-
-      else if(MutationOp == "swapFuncParam") { //TODO - make this function more robust for type-implicit conversions
+      } else if(MutationOp == "swapFuncParam") { //TODO - make this function more robust for type-implicit conversions
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::stringstream paramIndices(SwapParamNums); // populates stringstream with two indices values
         std::vector<Value*> newArgs;
+
+        // don't attempt to swap llvm instrinsic functions
+        if (op->getCalledFunction()->getName().startswith("llvm.")){
+          return nullptr;
+        }
 
         // extract the two indices
         int firstIndex, secondIndex;
@@ -238,7 +263,7 @@ namespace {
         llvm::Value* secondParam = newArgs[secondIndex];
 
         if (firstParam->getType() == secondParam->getType()) {
-          std::swap(firstParam, secondParam);
+          std::swap(newArgs[firstIndex], newArgs[secondIndex]);
         } else {
           auto firstCast = getTypeCast(builder, firstParam, secondParam);
           // if a type conversion is not supported, do not replace any instructions
@@ -251,32 +276,28 @@ namespace {
         }
         Instruction *inst = builder.CreateCall(op->getCalledFunction(), newArgs);
         return inst;
-      }
-
-      else if(MutationOp == "swapFuncCall"){
-        errs() << "Begin" << "\n";
+      } else if(MutationOp == "swapFuncCall"){
+        outs() << "Begin" << "\n";
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::vector<Value*> argList;
 
-        for(int i = 0; i < op->getCalledFunction()->arg_size(); ++i){
+        for(uint32_t i = 0; i < op->getCalledFunction()->arg_size(); ++i){
           argList.push_back(op->getOperand(i));
         }
 
         Instruction *inst = builder.CreateCall(stringToFunc[FunctionName], argList);
         //erase from parent here
         instToDelete.push_back(I);
-        errs() << "End" << "\n";
+        outs() << "End" << "\n";
         return inst;
-      }
-      // func(1,2,3); replace 3 with 4?
-      else if(MutationOp == "funcConstParam"){
+      } else if(MutationOp == "funcConstParam"){
         auto *op = dyn_cast<CallInst>(I);
         IRBuilder<> builder(op);
         std::vector<Value*> argList;
         
 
-        for(int i = 0; i < op->getCalledFunction()->arg_size(); ++i){
+        for(uint32_t i = 0; i < op->getCalledFunction()->arg_size(); ++i){
           argList.push_back(op->getOperand(i));
         }
         //Mutate here
@@ -291,7 +312,45 @@ namespace {
         instToDelete.push_back(I);
 
         //return inst;
+      } else if (MutationOp == "changeHash") {
+        // assumes the user is using the EPV_DIGEST interface of openssl
+        // Inject a call to EVP_md5
+        auto& ctx = M.getContext();
+        auto structTypes = M.getIdentifiedStructTypes();
+        bool foundType = false;
+        FunctionType* hashType = nullptr;
+
+        for (auto i: structTypes) {
+          if (i->getName() == StringRef("struct.evp_md_st")) {
+            foundType = true;
+            hashType = FunctionType::get(PointerType::getUnqual(i), false);
+            break;
+          }
+        }
+
+        if (!foundType) {
+          hashType = FunctionType::get(PointerType::getUnqual(StructType::create(ctx, StringRef("struct.epv_md_st"))), false);
+        }
+        FunctionCallee EPV_hash = M.getOrInsertFunction(StringRef("EVP_" + HashAlgorithm), hashType);
+
+        auto* op = dyn_cast<CallInst>(I);
+        IRBuilder<> builder(op);
+        Instruction* inst = builder.CreateCall(EPV_hash);
+        return inst;
+      } else if (MutationOp == "removeVoidCall") {
+        // eliminates a call to a void function, which changes state
+        auto op = dyn_cast<CallInst>(I);
+        IRBuilder<> builder(op);
+
+        if (op->getCalledFunction()->getName().startswith("llvm.") || !op->getCalledFunction()->getReturnType()->isVoidTy()) {
+          return nullptr;
+        }
+
+        Function* nop = Intrinsic::getDeclaration(&M, Intrinsic::donothing);
+        auto inst = builder.CreateCall(nop);
+        return inst;
       }
+
       return nullptr;
     }
     
@@ -301,7 +360,6 @@ namespace {
         IRBuilder<> builder(op);
         // check to make sure the current branch inst is actually an if-else block
         if (!op->isConditional() || op->getNumSuccessors() != 2) {
-          errs() << "nop\n";
           return false;
         }
 
@@ -316,11 +374,10 @@ namespace {
         // check to make sure the if-else block has no nested blocks
         if (thenBlockSuccessor != elseBlockSuccessor || thenBlockPredecessor != elseBlockPredecessor ||
             thenBlockSuccessor == nullptr || thenBlockPredecessor == nullptr) {
-          errs() << "nop\n";
           return false;
         }
 
-        Instruction* inst = builder.CreateCondBr(condValue, thenBlock, thenBlockSuccessor);
+        builder.CreateCondBr(condValue, thenBlock, thenBlockSuccessor);
         I->eraseFromParent();
         DeleteDeadBlock(elseBlock);
         return true;
@@ -432,70 +489,131 @@ namespace {
       return nullptr;
     }
 
+    Instruction* getRequestedMutantIntegerSignCastInst(Instruction* I) {
+      CastInst* castInst = dyn_cast<CastInst>(I);
+      IRBuilder<> builder(castInst);
+      outs() << castInst->getNumOperands() << '\n';
+      if (MutationOp == "zext") {
+        if (castInst->getOpcode() == Instruction::SExt) {
+          return dyn_cast<Instruction>(builder.CreateZExt(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      } else if (MutationOp == "sext") {
+        if (castInst->getOpcode() == Instruction::ZExt) {
+          return dyn_cast<Instruction>(builder.CreateSExt(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      } else if (MutationOp == "fptosi") {
+        if (castInst->getOpcode() == Instruction::FPToUI) {
+          return dyn_cast<Instruction>(builder.CreateFPToSI(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      } else if (MutationOp == "fptoui") {
+        if (castInst->getOpcode() == Instruction::FPToSI) {
+          return dyn_cast<Instruction>(builder.CreateFPToUI(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      } else if (MutationOp == "sitofp") {
+        if (castInst->getOpcode() == Instruction::UIToFP) {
+          return dyn_cast<Instruction>(builder.CreateSIToFP(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      } else if (MutationOp == "uitofp") {
+        if (castInst->getOpcode() == Instruction::SIToFP) {
+          return dyn_cast<Instruction>(builder.CreateSIToFP(castInst->getOperand(0), castInst->getDestTy()));
+        }
+      }
+      return nullptr;
+    }
+
+    Instruction* getRequestedMutantGEPInst(Instruction* I, Module& M)
+    {
+      // DataLayout moduleLayout(&M);
+      // GetElementPtrInst* gepInst = dyn_cast<GetElementPtrInst>(I);
+      // IRBuilder<> builder(gepInst);
+      // // refers to last index of GEP
+      // if (MutationOp == "incrementIndex") {
+      //   std::vector<Value*> argsList;
+
+      //   for (uint32_t i = 0; i < gepInst->getNumOperands(); ++i) {
+      //     argsList.emplace_back(gepInst->getOperand(i));
+      //   }
+
+      //   Value* lastOperand = argsList.back();
+      //   if (!isa<Constant>(lastOperand)) {
+      //     Value* offset = builder.CreateAdd(lastOperand, ConstantInt::get(lastOperand->getType(), 1));
+      //     argsList[argsList.size() - 1] = offset;
+      //   } else {
+      //     argsList[argsList.size() - 1] = lastOperand + ConstantInt::get(lastOperand->getType(), 1);
+      //   }
+
+      //   return dyn_cast<Instruction>(builder.CreateInBoundsGEP(gepInst->getType(), ))
+      // }
+      return nullptr;
+    }
+
     bool runOnModule(Module &M) {
       bool bModified = false;
-      for (auto &F : M) {
-        stringToFunc[std::string(F.getName())] = &F;
-        errs() << F.getName() << "\n";
-      }
+      uint64_t instrCnt = 0;
 
-      for (auto &F: M) {
-        for (auto &B : F) {
-          for (BasicBlock::iterator DI = B.begin(); DI != B.end();) {
-            Instruction *I = &*DI++;
+      for (auto& F: M) {
+        if (F.isDeclaration()) 
+          continue;
 
-            // if(isa<LoadInst>(*I)){
-            //   MutationOp = "loadint8";
-            //   Instruction* altI = getRequestSpecialOp(I);
-            //   auto *op = dyn_cast<LoadInst>(I);
+        for (inst_iterator i = inst_begin(F); i != inst_end(F) && !bModified; ++i) {
+          if (instrCnt == MutationLocation) {
+            Instruction* I = &*i;
+            Instruction* altI = nullptr;
 
-            //   for (auto &U : op->uses()) {
-            //     User *user = U.getUser();  // A User is anything with operands.
-            //     user->setOperand(U.getOperandNo(), altI);
-            //   }
-            //   //ReplaceInstWithInst(I, altI);
-            // }
-            
-            if (instrCnt == MutationLocation) {
-              errs() << "modified: " << instrCnt;
-              if (isa<LoadInst>(*I)) {
-                errs() << " Load Instruction Replaced" << "\n";
-                Instruction* altI = getRequestCallOp(I);
-                ReplaceInstWithInst(I, altI);
-              }
-              else if (isa<ICmpInst>(I)) {
-                errs() << " Comparison Instruction Replaced" << "\n";
-                Instruction *altI = getRequestedMutantIcmpInst(I);
-                ReplaceInstWithInst(I, altI);
-              }
-              else if (isa<BinaryOperator>(*I)) {
-                errs() << " Binary Operator Replaced" << "\n";
-                Instruction* altI = getRequestedMutationBinaryOp(I);
-                ReplaceInstWithInst(I, altI);
-              }
-              else if(isa<CallInst>(I)) {
-                errs() << " Custom Call Mutation Applied" << "\n";
-                Instruction* altI = getRequestCallOp(I);
-                ReplaceInstWithInst(I, altI);
-                errs() << "Instruction Replaced" << "\n";
-              }
-              else if (isa<BranchInst>(I)) {
-                errs() << "Custom Branch Mutation Applied\n";
-                if (!getRequestedBranchOp(I)) {
-                  errs() << "no else block detected\n";
-                }
-              }
+            if (MutationOp == "null") {
+              outs() << "nothing modified";
+              return false;
             }
-            instrCnt++;
-            bModified = true; 
+
+            if (isa<LoadInst>(I)) {
+              outs() << "Replacing Load Instruction\n";
+              altI = getRequestCallOp(I, M);
+            } else if (isa<ICmpInst>(I)) {
+              outs() << "Replacing Comparison Instruction\n";
+              altI = getRequestedMutantIcmpInst(I);
+            } else if (isa<BinaryOperator>(I)) {
+              outs() << "Replacing Binary Instruction\n";
+              altI = getRequestedMutationBinaryOp(I);
+            } else if (isa<CallInst>(I)) {
+              outs() << "Replacing Call Instruction\n";
+              altI = getRequestCallOp(I, M);
+            } else if (isa<BranchInst>(I)) {
+              outs() << "Replacing Branch Instruction\n";
+              if (!getRequestedBranchOp(I)) {
+                outs() << "no else block detected\n";
+              } else {
+                outs() << "else block successfully eliminated\n";
+                bModified = true;
+              }
+              break;
+            } else if (isa<CastInst>(I)) {
+              outs() << "Replacing Cast Instruction\n";
+              altI = getRequestedMutantIntegerSignCastInst(I);
+            } else if (isa<GetElementPtrInst>(I)) {
+              outs() << "Replacing GetElementPtr Instruction";
+              altI = getRequestedMutantGEPInst(I, M);
+            }
+
+            if (altI == nullptr) {
+              outs() << "nothing modified";
+              return bModified;
+            }
+
+            ReplaceInstWithInst(I, altI);
+            bModified = true;
           }
-        
+          ++instrCnt;
         }
       }
 
       for (unsigned i = 0; i < instToDelete.size(); ++i) {
-        errs() << "Deleted\n";
+        outs() << "Deleted\n";
         instToDelete[i]->eraseFromParent();
+      }
+
+      for (auto &F : M) {
+        stringToFunc[std::string(F.getName())] = &F;
+        outs() << F.getName() << "\n";
       }
       return bModified;
     }
