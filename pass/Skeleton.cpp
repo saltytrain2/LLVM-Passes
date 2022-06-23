@@ -581,30 +581,29 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantIntegerSignCastInst(Instruction* I) {
         CastInst* castInst = dyn_cast<CastInst>(I);
         IRBuilder<> builder(castInst);
-        outs() << castInst->getNumOperands() << '\n';
         if (MutationOp == "zext") {
-            if (castInst->getOpcode() == Instruction::SExt) {
+            if (castInst->getOpcode() == Instruction::CastOps::SExt) {
                 return dyn_cast<Instruction>(builder.CreateZExt(castInst->getOperand(0), castInst->getDestTy()));
             }
         } else if (MutationOp == "sext") {
-            if (castInst->getOpcode() == Instruction::ZExt) {
+            if (castInst->getOpcode() == Instruction::CastOps::ZExt) {
                 return dyn_cast<Instruction>(builder.CreateSExt(castInst->getOperand(0), castInst->getDestTy()));
             }
         } else if (MutationOp == "fptosi") {
-            if (castInst->getOpcode() == Instruction::FPToUI) {
+            if (castInst->getOpcode() == Instruction::CastOps::FPToUI) {
                 return dyn_cast<Instruction>(builder.CreateFPToSI(castInst->getOperand(0), castInst->getDestTy()));
             }
         } else if (MutationOp == "fptoui") {
-            if (castInst->getOpcode() == Instruction::FPToSI) {
+            if (castInst->getOpcode() == Instruction::CastOps::FPToSI) {
                 return dyn_cast<Instruction>(builder.CreateFPToUI(castInst->getOperand(0), castInst->getDestTy()));
             }
          } else if (MutationOp == "sitofp") {
-            if (castInst->getOpcode() == Instruction::UIToFP) {
+            if (castInst->getOpcode() == Instruction::CastOps::UIToFP) {
                 return dyn_cast<Instruction>(builder.CreateSIToFP(castInst->getOperand(0), castInst->getDestTy()));
             }
         } else if (MutationOp == "uitofp") {
-            if (castInst->getOpcode() == Instruction::SIToFP) {
-                return dyn_cast<Instruction>(builder.CreateSIToFP(castInst->getOperand(0), castInst->getDestTy()));
+            if (castInst->getOpcode() == Instruction::CastOps::SIToFP) {
+                return dyn_cast<Instruction>(builder.CreateUIToFP(castInst->getOperand(0), castInst->getDestTy()));
             }
         }
         return nullptr;
@@ -650,27 +649,27 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
                     Instruction* altI = nullptr;
 
                     if (MutationOp == "null") {
-                        outs() << "nothing modified";
+                        outs() << "nothing modified\n";
                         return false;
                     }
 
                     if (isa<LoadInst>(I)) {
-                        outs() << "Replacing Load Instruction\n";
+                        outs() << "Replacing Load Instruction: ";
                         altI = getRequestedLoadOp(I);
                     } else if (isa<ICmpInst>(I)) {
-                        outs() << "Replacing Immediate Comparison Instruction\n";
+                        outs() << "Replacing Immediate Comparison Instruction: ";
                         altI = getRequestedMutantIcmpInst(I);
                     } else if (isa<FCmpInst>(I)) {
-                        outs() << "Replacing Floating-point Comparison Instruction\n";
+                        outs() << "Replacing Floating-point Comparison Instruction: ";
                         altI = getRequestedMutantFcmpInst(I);
                     } else if (isa<BinaryOperator>(I)) {
-                        outs() << "Replacing Binary Instruction\n";
+                        outs() << "Replacing Binary Instruction: ";
                         altI = getRequestedMutationBinaryOp(I);
                     } else if (isa<CallInst>(I)) {
-                        outs() << "Replacing Call Instruction\n";
+                        outs() << "Replacing Call Instruction: ";
                         altI = getRequestedCallOp(I, M);
                     } else if (isa<BranchInst>(I)) {
-                        outs() << "Replacing Branch Instruction\n";
+                        outs() << "Replacing Branch Instruction: ";
                         if (!getRequestedBranchOp(I)) {
                             outs() << "no else block detected\n";
                         } else {
@@ -679,16 +678,18 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
                         }
                         break;
                     } else if (isa<CastInst>(I)) {
-                        outs() << "Replacing Cast Instruction\n";
+                        outs() << "Replacing Cast Instruction: ";
                         altI = getRequestedMutantIntegerSignCastInst(I);
                     } else if (isa<GetElementPtrInst>(I)) {
-                        outs() << "Replacing GetElementPtr Instruction";
+                        outs() << "Replacing GetElementPtr Instruction: ";
                         altI = getRequestedMutantGEPInst(I, M);
                     }
 
                     if (altI == nullptr) {
-                        outs() << "nothing modified";
+                        outs() << "nothing modified\n";
                         return bModified;
+                    } else {
+                        outs() << "\n";
                     }
 
                     ReplaceInstWithInst(I, altI);
