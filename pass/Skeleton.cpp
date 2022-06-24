@@ -249,15 +249,14 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedCallOp(Instruction* I, Module& M) {
         CallInst* callInst = dyn_cast<CallInst>(I);
         IRBuilder<> builder(callInst);
+        // dont attempt to do any modifications with llvm intrinsic functions
+        if (callInst->getCalledFunction()->getName().startswith("llvm.")) {
+            return nullptr;
+        }
 
         if (MutationOp == "swapFuncParam") { //TODO - make this function more robust for type-implicit conversions
             std::stringstream paramIndices(SwapParamNums); // populates stringstream with two indices values
             std::vector<Value*> newArgs;
-
-            // don't attempt to swap llvm instrinsic functions
-            if (callInst->getCalledFunction()->getName().startswith("llvm.")) {
-                return nullptr;
-            }
 
             // extract the two indices
             int firstIndex, secondIndex;
