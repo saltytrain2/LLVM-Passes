@@ -172,12 +172,12 @@ struct LabelPass : public PassInfoMixin<LabelPass> {
                 outs() << instrCnt << " " << i->getOpcodeName() << " ";
                 if (isa<CallInst>(&*i)) {
                     CallInst* op = dyn_cast<CallInst>(&*i);
-                    if (op->getCalledFunction() != nullptr) {
+                    if (!op->getCalledFunction()) {
+                        mystream << "indirect " << op->getNumArgOperands() << '\n';
+                        outs() << "indirect " << op->getNumArgOperands() << '\n';
+                    } else {
                         mystream << op->getCalledFunction()->getName().str() << ' ' << op->getNumArgOperands() << '\n';
                         outs() << op->getCalledFunction()->getName() << ' ' << op->getNumArgOperands() << '\n';
-                    } else {
-                        mystream << "indirect " << op->getNumOperands() << '\n';
-                        outs() << "indirect " << op->getNumOperands() << '\n';
                     }
                 } else if (isa<GetElementPtrInst>(&*i)) {
                     GetElementPtrInst* op = dyn_cast<GetElementPtrInst>(&*i);
@@ -194,10 +194,10 @@ struct LabelPass : public PassInfoMixin<LabelPass> {
 
                 ++instrCnt;
             }
-        mystream << "\n";
-        outs() << "\n";
-      }
-      return isModified;
+            mystream << "\n";
+            outs() << "\n";
+        }
+        return isModified;
     }
 
     // bool runOnFunction(Function &F) {
@@ -250,7 +250,7 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
         CallInst* callInst = dyn_cast<CallInst>(I);
         IRBuilder<> builder(callInst);
         // dont attempt to do any modifications with llvm intrinsic functions
-        if (callInst->getCalledFunction()->getName().startswith("llvm.")) {
+        if (callInst->getCalledFunction() && callInst->getCalledFunction()->getName().startswith("llvm.")) {
             return nullptr;
         }
 
@@ -264,7 +264,7 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
             paramIndices >> secondIndex;
 
             for (uint32_t i = 0; i < callInst->getNumArgOperands(); ++i) {
-            newArgs.push_back(callInst->getArgOperand(i));
+                newArgs.push_back(callInst->getArgOperand(i));
             }
 
             llvm::Value* firstParam = newArgs[firstIndex];
@@ -282,7 +282,7 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
                 std::swap(newArgs[firstIndex], secondCast);
                 std::swap(newArgs[secondIndex], firstCast);
             } 
-            return CallInst::Create(callInst->getCalledFunction(), newArgs);
+            return CallInst::Create(callInst->getFunctionType(), callInst->getCalledOperand(), newArgs);
         } else if (MutationOp == "swapFuncCall") {
             outs() << "Begin" << "\n";
             std::vector<Value*> argList;
@@ -340,12 +340,12 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
             return dyn_cast<Instruction>(builder.CreateCall(EPV_hash));
         } else if (MutationOp == "removeVoidCall") {
             // eliminates a call to a void function, which changes state
-            if (callInst->getCalledFunction()->getName().startswith("llvm.") || !callInst->getCalledFunction()->getReturnType()->isVoidTy()) {
+            if (callInst->getCalledFunction() && !callInst->getCalledFunction()->getReturnType()->isVoidTy()) {
                 return nullptr;
             }
 
             Function* nop = Intrinsic::getDeclaration(&M, Intrinsic::donothing);
-            return CallInst::Create(nop, NoneType::None);
+            return CallInst::Create(nop->getFunctionType(), nop, NoneType::None);
         }
 
         return nullptr;
@@ -405,56 +405,56 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
 
     Instruction* getRequestedMutantBinaryIntegerOp(Instruction* binop) {
         if (MutationOp == "add"){
-            return BinaryOperator::CreateAdd(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Add ? nullptr : BinaryOperator::CreateAdd(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "sub") {
-            return BinaryOperator::CreateSub(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Sub ? nullptr : BinaryOperator::CreateSub(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "mul") {
-            return BinaryOperator::CreateMul(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Mul ? nullptr : BinaryOperator::CreateMul(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "udiv") {
-            return BinaryOperator::CreateUDiv(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::UDiv ? nullptr : BinaryOperator::CreateUDiv(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "sdiv") {
-            return BinaryOperator::CreateSDiv(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::SDiv ? nullptr : BinaryOperator::CreateSDiv(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "urem") {
-            return BinaryOperator::CreateURem(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::URem ? nullptr : BinaryOperator::CreateURem(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "srem") {
-            return BinaryOperator::CreateSRem(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::SRem ? nullptr : BinaryOperator::CreateSRem(binop->getOperand(0), binop->getOperand(1));
         }
         return nullptr;
     }
 
     Instruction* getRequestedMutantBinaryFloatingOp(Instruction* binop) {
         if (MutationOp == "fadd") {
-            return BinaryOperator::CreateFAdd(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::FAdd ? nullptr : BinaryOperator::CreateFAdd(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "fsub") {
-            return BinaryOperator::CreateFSub(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::FSub ? nullptr : BinaryOperator::CreateFSub(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "fmul") {
-            return BinaryOperator::CreateFMul(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::FMul ? nullptr : BinaryOperator::CreateFMul(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "fdiv") {
-            return BinaryOperator::CreateFDiv(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::FDiv ? nullptr :  BinaryOperator::CreateFDiv(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "frem") {
-            return BinaryOperator::CreateFRem(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::FRem ? nullptr : BinaryOperator::CreateFRem(binop->getOperand(0), binop->getOperand(1));
         }
         return nullptr;
     }
 
     Instruction* getRequestedMutantBinaryLogicalOp(Instruction* binop) {
         if (MutationOp == "and") {
-            return BinaryOperator::CreateAnd(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::And ? nullptr : BinaryOperator::CreateAnd(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "or") {
-            return BinaryOperator::CreateOr(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Or ? nullptr : BinaryOperator::CreateOr(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "xor") {
-            return BinaryOperator::CreateXor(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Xor ? nullptr : BinaryOperator::CreateXor(binop->getOperand(0), binop->getOperand(1));
         }
         return nullptr;
     }
 
     Instruction* getRequestedMutantBinaryShiftOp(Instruction* binop) {
         if (MutationOp == "shl") {
-            return BinaryOperator::CreateShl(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::Shl ? nullptr : BinaryOperator::CreateShl(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "lshr") {
-            return BinaryOperator::CreateLShr(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::LShr ? nullptr : BinaryOperator::CreateLShr(binop->getOperand(0), binop->getOperand(1));
         } else if (MutationOp == "ashr") {
-            return BinaryOperator::CreateAShr(binop->getOperand(0), binop->getOperand(1));
+            return binop->getOpcode() == Instruction::BinaryOps::AShr ? nullptr : BinaryOperator::CreateAShr(binop->getOperand(0), binop->getOperand(1));
         }
         return nullptr;
     }
@@ -478,13 +478,13 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantIcmpUnsignedInst(ICmpInst* cmpInst)
     {
         if (MutationOp == "icmpUgt") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_UGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_UGT ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_UGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpUge") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_UGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_UGE ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_UGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpUlt") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_ULT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_ULT ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_ULT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpUle") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_ULE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_ULE ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_ULE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         }
 
         return nullptr;
@@ -493,13 +493,13 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantIcmpSignedInst(ICmpInst* cmpInst)
     {
         if(MutationOp == "icmpSgt") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SGT ? nullptr : cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SGT ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpSge") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SGE ? nullptr : cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SGE ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpSlt") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SLT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SLT ? nullptr : cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SLT ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SLT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if(MutationOp == "icmpSle") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SLE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SLE ? nullptr : cmpInst->getPredicate() == CmpInst::Predicate::ICMP_SLE ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_SLE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         }
         return nullptr;
     }
@@ -509,9 +509,9 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
         IRBuilder<> builder(cmpInst);
 
         if (MutationOp == "icmpEq") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_EQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_EQ ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_EQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "icmpNe") {
-            return CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_NE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::ICMP_NE ? nullptr : CmpInst::Create(Instruction::OtherOps::ICmp, CmpInst::Predicate::ICMP_NE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (cmpInst->getPredicate() < CmpInst::Predicate::ICMP_SGT) {
             return getRequestedMutantIcmpUnsignedInst(cmpInst);
         } else {
@@ -522,19 +522,19 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantFcmpOrderedInst(FCmpInst* cmpInst)
     {
         if (MutationOp == "fcmpOeq") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OEQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_OEQ ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OEQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOne") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ONE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_ONE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ONE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOgt") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_OGT ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOge") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_OGE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOlt") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OLT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_OLT ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OLT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOle") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OLE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_OLE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_OLE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpOrd") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ORD, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_ORD ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ORD, cmpInst->getOperand(0), cmpInst->getOperand(1));
         }
         return nullptr;
     }
@@ -542,19 +542,19 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantFcmpUnorderedInst(FCmpInst* cmpInst)
     {
         if (MutationOp == "fcmpUeq") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UEQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_UEQ ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UEQ, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUne") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UNE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_UNE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UNE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUgt") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_UGT ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UGT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUge") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_UGE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UGE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUlt") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ULT, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_ULT ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ULT, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUle") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ULE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_ULE ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_ULE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpUno") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UNO, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_UNO ? nullptr : CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_UNO, cmpInst->getOperand(0), cmpInst->getOperand(1));
         }
         return nullptr;
     }
@@ -563,9 +563,9 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
         FCmpInst* cmpInst = dyn_cast<FCmpInst>(I);
 
         if (MutationOp == "fcmpTrue") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_TRUE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_TRUE ? nullptr : cmpInst-> CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_TRUE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (MutationOp == "fcmpFalse") {
-            return CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_FALSE, cmpInst->getOperand(0), cmpInst->getOperand(1));
+            return cmpInst->getPredicate() == CmpInst::Predicate::FCMP_FALSE ? nullptr : cmpInst-> CmpInst::Create(Instruction::OtherOps::FCmp, CmpInst::Predicate::FCMP_FALSE, cmpInst->getOperand(0), cmpInst->getOperand(1));
         } else if (!(cmpInst->getPredicate() & 0x8)) {
             return getRequestedMutantFcmpOrderedInst(cmpInst);
         } else {
@@ -578,29 +578,17 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
     Instruction* getRequestedMutantIntegerSignCastInst(Instruction* I) {
         CastInst* castInst = dyn_cast<CastInst>(I);
         if (MutationOp == "zext") {
-            if (castInst->getOpcode() == Instruction::CastOps::SExt) {
-                return CastInst::Create(Instruction::CastOps::ZExt, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::SExt ? CastInst::Create(Instruction::CastOps::ZExt, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
         } else if (MutationOp == "sext") {
-            if (castInst->getOpcode() == Instruction::CastOps::ZExt) {
-                return CastInst::Create(Instruction::CastOps::SExt, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::ZExt ? CastInst::Create(Instruction::CastOps::SExt, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
         } else if (MutationOp == "fptosi") {
-            if (castInst->getOpcode() == Instruction::CastOps::FPToUI) {
-                return CastInst::Create(Instruction::CastOps::FPToSI, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::FPToUI ? CastInst::Create(Instruction::CastOps::FPToSI, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
         } else if (MutationOp == "fptoui") {
-            if (castInst->getOpcode() == Instruction::CastOps::FPToSI) {
-                return CastInst::Create(Instruction::CastOps::FPToUI, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::FPToSI ? CastInst::Create(Instruction::CastOps::FPToUI, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
          } else if (MutationOp == "sitofp") {
-            if (castInst->getOpcode() == Instruction::CastOps::UIToFP) {
-                return CastInst::Create(Instruction::CastOps::SIToFP, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::UIToFP ? CastInst::Create(Instruction::CastOps::SIToFP, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
         } else if (MutationOp == "uitofp") {
-            if (castInst->getOpcode() == Instruction::CastOps::SIToFP) {
-                return CastInst::Create(Instruction::CastOps::UIToFP, castInst->getOperand(0), castInst->getDestTy());
-            }
+            return castInst->getOpcode() == Instruction::CastOps::SIToFP ? CastInst::Create(Instruction::CastOps::UIToFP, castInst->getOperand(0), castInst->getDestTy()) : nullptr;
         }
         return nullptr;
     }
