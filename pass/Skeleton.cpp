@@ -615,27 +615,6 @@ struct MutatePass : public PassInfoMixin<MutatePass> {
 
     Instruction* getRequestedMutantGEPInst(Instruction* I, Module& M)
     {
-      // DataLayout moduleLayout(&M);
-      // GetElementPtrInst* gepInst = dyn_cast<GetElementPtrInst>(I);
-      // IRBuilder<> builder(gepInst);
-      // // refers to last index of GEP
-      // if (MutationOp == "incrementIndex") {
-      //   std::vector<Value*> argsList;
-
-      //   for (uint32_t i = 0; i < gepInst->getNumOperands(); ++i) {
-      //     argsList.emplace_back(gepInst->getOperand(i));
-      //   }
-
-      //   Value* lastOperand = argsList.back();
-      //   if (!isa<Constant>(lastOperand)) {
-      //     Value* offset = builder.CreateAdd(lastOperand, ConstantInt::get(lastOperand->getType(), 1));
-      //     argsList[argsList.size() - 1] = offset;
-      //   } else {
-      //     argsList[argsList.size() - 1] = lastOperand + ConstantInt::get(lastOperand->getType(), 1);
-      //   }
-
-      //   return dyn_cast<Instruction>(builder.CreateInBoundsGEP(gepInst->getType(), ))
-      // }
       return nullptr;
     }
 
@@ -763,23 +742,27 @@ struct RegisterInfoPass : public PassInfoMixin<RegisterInfoPass> {
         Constant* timeptr = M.getOrInsertGlobal("time", arrayTy);
         dyn_cast<GlobalVariable>(timeptr)->setInitializer(zeroInit);
         dyn_cast<GlobalVariable>(timeptr)->setAlignment(MaybeAlign(4));
+        dyn_cast<GlobalVariable>(timeptr)->setDSOLocal(true);
 
         arrayTy = ArrayType::get(IntegerType::getInt64Ty(M.getContext()), 16);
         zeroInit = ConstantAggregateZero::get(arrayTy);
         Constant* regsptr = M.getOrInsertGlobal("regs", arrayTy);
         dyn_cast<GlobalVariable>(regsptr)->setInitializer(zeroInit);
         dyn_cast<GlobalVariable>(regsptr)->setAlignment(MaybeAlign(16));
+        dyn_cast<GlobalVariable>(regsptr)->setDSOLocal(true);
 
         arrayTy = ArrayType::get(IntegerType::getInt8Ty(M.getContext()), 3276700);
         Constant* stringptr = M.getOrInsertGlobal("regstring", arrayTy);
         dyn_cast<GlobalVariable>(stringptr)->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         dyn_cast<GlobalVariable>(stringptr)->setAlignment(MaybeAlign(16));
+        dyn_cast<GlobalVariable>(stringptr)->setDSOLocal(true);
 
         arrayTy = ArrayType::get(IntegerType::getInt8Ty(M.getContext()), 30);
         zeroInit = ConstantAggregateZero::get(arrayTy);
         Constant* tempstrptr = M.getOrInsertGlobal("tempstring", arrayTy);
         dyn_cast<GlobalVariable>(tempstrptr)->setInitializer(zeroInit);
         dyn_cast<GlobalVariable>(tempstrptr)->setAlignment(MaybeAlign(16));
+        dyn_cast<GlobalVariable>(tempstrptr)->setDSOLocal(true);
     }
 
     void insertFunctions(Module& M) {
@@ -917,8 +900,6 @@ struct RegisterInfoPass : public PassInfoMixin<RegisterInfoPass> {
             callstrcat->setTailCall(true);
             builder.CreateStore(ConstantInt::get(IntegerType::getInt8Ty(M.getContext()), 0), getInBoundsGEP(tempstrTy, "tempstring", M, 0));
         }
-
-        
     }
 
     bool runOnModule(Module& M) {
@@ -937,10 +918,193 @@ struct RegisterInfoPass : public PassInfoMixin<RegisterInfoPass> {
                     injectRegisterInsts(&*i, M);
                     isModified = true;
                 }
-            ++instrCnt;
+                ++instrCnt;
             }
         }
         return isModified;
+    }
+
+    static bool isRequired() { return true; }
+};
+}
+
+namespace {
+struct RegisterExitPass : public PassInfoMixin<RegisterExitPass> {
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
+        bool Changed = runOnModule(M);
+        return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
+
+    void insertGlobals(Module& M) {
+        auto& ctx = M.getContext();
+        IntegerType* int32ty = IntegerType::getInt32Ty(ctx);
+        IntegerType* int64ty = IntegerType::getInt64Ty(ctx);
+        IntegerType* int8ty = IntegerType::getInt8Ty(ctx);
+        PointerType* int8ptr = IntegerType::getInt8PtrTy(ctx);
+
+        ArrayType* arrayTy = ArrayType::get(int8ty, 3276700);
+        ConstantAggregateZero* zeroInit = ConstantAggregateZero::get(arrayTy);
+        Constant* initStr = ConstantDataArray::getString(ctx, "", true);
+        Constant* stringptr = M.getOrInsertGlobal("regstring", arrayTy);
+        dyn_cast<GlobalVariable>(stringptr)->setAlignment(MaybeAlign(16));
+        dyn_cast<GlobalVariable>(stringptr)->setInitializer(zeroInit);
+
+        arrayTy = ArrayType::get(int8ty, OutputFile.length() + 1);
+        initStr = ConstantDataArray::getString(ctx, static_cast<const char*>(OutputFile.data()), true);
+        Constant* outputFilePtr = M.getOrInsertGlobal("outputFile", arrayTy);
+        dyn_cast<GlobalVariable>(outputFilePtr)->setAlignment(MaybeAlign(1));
+        dyn_cast<GlobalVariable>(outputFilePtr)->setInitializer(initStr);
+        dyn_cast<GlobalVariable>(outputFilePtr)->setConstant(true);
+        dyn_cast<GlobalVariable>(outputFilePtr)->setLinkage(GlobalValue::LinkageTypes::PrivateLinkage);
+        dyn_cast<GlobalVariable>(outputFilePtr)->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+
+        arrayTy = ArrayType::get(int8ty, 2);
+        initStr = ConstantDataArray::getString(ctx, "a", true);
+        Constant* filemodeptr = M.getOrInsertGlobal("filemode", arrayTy);
+        dyn_cast<GlobalVariable>(filemodeptr)->setAlignment(MaybeAlign(1));
+        dyn_cast<GlobalVariable>(filemodeptr)->setInitializer(initStr);
+        dyn_cast<GlobalVariable>(filemodeptr)->setConstant(true);
+        dyn_cast<GlobalVariable>(filemodeptr)->setLinkage(GlobalValue::LinkageTypes::PrivateLinkage);
+        dyn_cast<GlobalVariable>(filemodeptr)->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+    }
+
+    Constant* getInBoundsGEP(Type* ty, std::string name, Module& M, uint64_t index) {
+        std::vector<Constant*> indices;
+        indices.push_back(ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), 0));
+        indices.push_back(ConstantInt::get(IntegerType::getInt64Ty(M.getContext()), index));
+        return ConstantExpr::getInBoundsGetElementPtr(ty, M.getOrInsertGlobal(name, ty), indices);
+    }
+
+    FunctionCallee insertHandler(Module& M) {
+        auto& ctx = M.getContext();
+        IntegerType* int32ty = IntegerType::getInt32Ty(ctx);
+        IntegerType* int64ty = IntegerType::getInt64Ty(ctx);
+        IntegerType* int8ty = IntegerType::getInt8Ty(ctx);
+        IntegerType* int16ty = IntegerType::getInt16Ty(ctx);
+        PointerType* int8ptr = IntegerType::getInt8PtrTy(ctx);
+        auto structTypes = M.getIdentifiedStructTypes();
+        bool foundType = false;
+
+        StructType* file = nullptr;
+        for (auto i: structTypes) {
+            if (i->hasName() && i->getName() == "struct._IO_FILE") {
+                foundType = true;
+                file = i;
+                break;
+            }
+        }
+
+        // have to create the structs necessary for a FILE struct
+        if (!foundType) {
+            StructType* ioMarker = StructType::create(ctx, StringRef("struct._IO_marker"));
+            StructType* ioCodecvt = StructType::create(ctx, "struct._IO_codecvt");
+            StructType* ioWideData = StructType::create(ctx, "struct._IO_wide_data");
+            // M.getOrInsertGlobal(ioMarker);
+            // M.getOrInsertGlobal(ioCodecvt);
+            // M.getOrInsertGlobal(ioWideData);
+
+            std::vector<Type*> ioFileTy;
+            file = StructType::create(ctx, "struct._IO_FILE");
+            ioFileTy.push_back(int32ty);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(PointerType::getUnqual(ioMarker));
+            ioFileTy.push_back(PointerType::getUnqual(file));
+            ioFileTy.push_back(int32ty);
+            ioFileTy.push_back(int32ty);
+            ioFileTy.push_back(int64ty);
+            ioFileTy.push_back(int16ty);
+            ioFileTy.push_back(int8ty);
+            ioFileTy.push_back(ArrayType::get(int8ty, 1));
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int64ty);
+            ioFileTy.push_back(PointerType::getUnqual(ioCodecvt));
+            ioFileTy.push_back(PointerType::getUnqual(ioWideData));
+            ioFileTy.push_back(PointerType::getUnqual(file));
+            ioFileTy.push_back(int8ptr);
+            ioFileTy.push_back(int64ty);
+            ioFileTy.push_back(int32ty);
+            ioFileTy.push_back(ArrayType::get(int8ty, 20));
+
+            file->setBody(ioFileTy, false);
+        }
+        PointerType* fileptr = PointerType::getUnqual(file);
+
+        // insert the handler
+        FunctionType* voidTy = FunctionType::get(Type::getVoidTy(ctx), false);
+        FunctionType* fopenTy = FunctionType::get(fileptr, {int8ptr, int8ptr}, false);
+        FunctionType* fputsTy = FunctionType::get(int32ty, {int8ptr, fileptr}, false);
+        FunctionType* fcloseTy = FunctionType::get(int32ty, fileptr, false);
+        FunctionCallee handler = M.getOrInsertFunction("regInfoNormalExitHandler", voidTy);
+        FunctionCallee fopenFunc = M.getOrInsertFunction("fopen", fopenTy);
+        FunctionCallee fputsFunc = M.getOrInsertFunction("fputs", fputsTy);
+        FunctionCallee fcloseFunc = M.getOrInsertFunction("fclose", fcloseTy);
+
+        ArrayType* regstringty = ArrayType::get(int8ty, 3276700);
+        ArrayType* filenamety = ArrayType::get(int8ty, OutputFile.length() + 1);
+        ArrayType* modety = ArrayType::get(int8ty, 2);
+        Constant* filename = getInBoundsGEP(filenamety, "outputFile", M, 0);
+        Constant* mode = getInBoundsGEP(modety, "filemode", M, 0);
+        Constant* regstring = getInBoundsGEP(regstringty, "regstring", M, 0);
+
+        // insert instructions
+        BasicBlock* handlerBlock = BasicBlock::Create(ctx, "", dyn_cast<Function>(handler.getCallee()));
+        IRBuilder<> builder(handlerBlock);
+
+        CallInst* fileStructPtr = builder.CreateCall(fopenFunc, {filename, mode});
+        fileStructPtr->setTailCall();
+        CallInst* writeToFile = builder.CreateCall(fputsFunc, {regstring, fileStructPtr});
+        writeToFile->setTailCall();
+        builder.CreateCall(fcloseFunc, fileStructPtr)->setTailCall();
+        builder.CreateRetVoid();
+        return handler;
+    }
+
+    bool runOnModule(Module& M) {
+        // injection of global string constants and arrays
+        auto& ctx = M.getContext();
+        insertGlobals(M);
+        FunctionCallee handle = insertHandler(M);
+
+        // insert atexit and final dump call
+        for (auto& F: M) {
+            if (F.getName() != "main") {
+                continue;
+            }
+            IntegerType* int32ty = IntegerType::getInt32Ty(ctx);
+            PointerType* funcPtr = PointerType::getUnqual(FunctionType::get(Type::getVoidTy(ctx), false));
+            FunctionType* atexitTy = FunctionType::get(int32ty, funcPtr, false);
+            FunctionCallee atexitFunc = M.getOrInsertFunction("atexit", atexitTy);
+            IRBuilder<> builder(&*F.getEntryBlock().getFirstInsertionPt());
+            builder.CreateCall(atexitFunc, handle.getCallee());
+            break;
+        }
+        return true;
+    //     insertGlobals(M);
+    //     insertFunctions(M);
+    //     bool isModified = false;
+    //     uint64_t instrCnt = 0;
+    //     for (auto& F: M) {
+    //         if (F.isDeclaration()) 
+    //             continue;
+
+    //         for (inst_iterator i = inst_begin(F); i != inst_end(F) && !isModified; ++i) {
+    //             if (instrCnt == MutationLocation) {
+    //                 isModified = true;
+    //             }
+    //         ++instrCnt;
+    //         }
+    //     }
+    //     return isModified;
     }
 
     static bool isRequired() { return true; }
@@ -973,6 +1137,9 @@ llvm::PassPluginLibraryInfo getSkeletonPassPluginInfo() {
                         return true;
                    } else if (Name == "register-info-pass") {
                         MPM.addPass(RegisterInfoPass());
+                        return true;
+                   } else if (Name == "register-exit-pass") {
+                        MPM.addPass(RegisterExitPass());
                         return true;
                    }
                    return false;
