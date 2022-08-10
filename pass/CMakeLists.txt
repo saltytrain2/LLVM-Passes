@@ -16,5 +16,18 @@
 #     )
 # endif(APPLE)
 
+set(INCLUDE_DIR ../include)
+set(PASS_SOURCES 
+    ResearchPasses.cpp
+    SkeletonPass.cpp
+    MemoryPass.cpp
+    MutatePass.cpp
+    LabelPass.cpp
+    RegisterInfoPass.cpp
+    RegisterExitPass.cpp
+    WindowPass.cpp
+    SingleWindowPass.cpp
+)
 
-add_library(SkeletonPass SHARED Skeleton.cpp)
+add_library(ResearchPasses SHARED ${PASS_SOURCES})
+target_include_directories(ResearchPasses PRIVATE ${INCLUDE_DIR})
