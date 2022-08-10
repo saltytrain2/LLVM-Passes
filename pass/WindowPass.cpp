@@ -75,11 +75,19 @@ void WindowPass::insertBefore(inst_iterator instToWrite, inst_iterator startInst
     --prevIterator;
     if (prevIterator->isTerminator() && depthleft != 1) {
         for (auto i = pred_begin(parent); i != pred_end(parent); ++i) {
+            inst_iterator predIter(prevIterator);
             BasicBlock* pred = *i;
-            while (prevIterator->getParent() != pred) {
+            while (predIter->getParent() != pred && predIter != startInst) {
                 --prevIterator;
             }
-            insertBefore(prevIterator, startInst, window, depthleft - 1);
+            // reached beginning, predecessor after current block
+            if (predIter == startInst) {
+                predIter = instToWrite;
+                while (predIter->getParent() != pred) {
+                    ++predIter;
+                }
+            }
+            insertBefore(predIter, startInst, window, depthleft - 1);
         }
     } else {
         insertBefore(prevIterator, startInst, window, depthleft - 1);
@@ -105,11 +113,19 @@ void WindowPass::insertAfter(inst_iterator instToWrite, inst_iterator endInst, s
     ++nextIterator;
     if (instToWrite->isTerminator() && instToWrite->getNumSuccessors() != 0) {
         for (auto i = succ_begin(parent); i != succ_end(parent); ++i) {
+            inst_iterator succIter(nextIterator);
             BasicBlock* succ = *i;
-            while (nextIterator->getParent() != succ) {
-                ++nextIterator;
+            while (succIter->getParent() != succ && succIter != endInst) {
+                ++succIter;
             }
-            insertAfter(nextIterator, endInst, window, depthleft - 1);
+            // reached end, successor is before current block
+            if (succIter == endInst) {
+                succIter = instToWrite;
+                while (succIter->getParent() != succ) {
+                    --succIter;
+                }
+            }
+            insertAfter(succIter, endInst, window, depthleft - 1);
         }
     } else {
         insertAfter(nextIterator, endInst, window, depthleft - 1);
