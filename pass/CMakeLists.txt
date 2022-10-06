@@ -27,6 +27,7 @@ set(PASS_SOURCES
     RegisterExitPass.cpp
     WindowPass.cpp
     SingleWindowPass.cpp
+    FuncNameChangePass.cpp
 )
 
 add_library(ResearchPasses SHARED ${PASS_SOURCES})

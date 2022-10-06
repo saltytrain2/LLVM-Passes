@@ -15,12 +15,13 @@
 class WindowPass : public llvm::PassInfoMixin<WindowPass>
 {
 public:
-    WindowPass(std::string outputFile);
+    WindowPass(std::string outputFile, std::string functionName);
     inline static bool isRequired() { return true; }
     llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
 
 private:
     std::ofstream mOutputStream;
+    std::string mFunctionName;
     std::unique_ptr<std::vector<std::string>> mPredWindows;
 
     void write(llvm::Instruction* I, std::string& window);

@@ -13,6 +13,7 @@
 #include "RegisterExitPass.h"
 #include "WindowPass.h"
 #include "SingleWindowPass.h"
+#include "FuncNameChangePass.h"
 
 using namespace llvm;
 
@@ -31,6 +32,7 @@ static cl::opt<std::string> OutputFile("output_file", cl::desc("Output filename.
 static cl::opt<std::string> SwapParamNums("swap_param_nums", cl::desc("Specify the position of the two parameters to swap (Mutation_op flag must be swapFuncParam, declared as 'num1 num2')"), cl::value_desc("String"));
 
 static cl::opt<std::string> HashAlgorithm("hash_algorithm", cl::desc("Specify the hashing algorithm to implement (Mutation_op flag must be changeHash)"), cl::value_desc("String"));
+
 
 llvm::PassPluginLibraryInfo getSkeletonPassPluginInfo() {
     return {LLVM_PLUGIN_API_VERSION, "skeleton-pass", LLVM_VERSION_STRING,
@@ -63,11 +65,13 @@ llvm::PassPluginLibraryInfo getSkeletonPassPluginInfo() {
                         MPM.addPass(RegisterExitPass(OutputFile));
                         return true;
                    } else if (Name == "window-pass") {
-                        MPM.addPass(WindowPass(OutputFile));
+                        MPM.addPass(WindowPass(OutputFile, FunctionName));
                         return true;
                    } else if (Name == "single-window-pass") {
                          MPM.addPass(SingleWindowPass(MutationLocation, MutationOp));
                          return true;
+                   } else if (Name == "func-name-change-pass") {
+                         MPM.addPass(FuncNameChangePass())
                    }
                    return false;
                 });

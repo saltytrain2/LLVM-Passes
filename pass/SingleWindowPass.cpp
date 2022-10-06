@@ -61,9 +61,9 @@ void SingleWindowPass::insertBefore(inst_iterator instToWrite, inst_iterator sta
     }
 
     if (depthleft == 5) {
-        if (mMutationOp.find("swapFuncCall") != std::string::npos) {
+        if (mMutationOp.find("swapfunccall") != std::string::npos) {
             window = "call ";
-        } else if (mMutationOp != "removeVoidCall") {
+        } else if (mMutationOp != "removevoidcall") {
             window = mMutationOp + " ";
         }
     } else {
@@ -87,16 +87,14 @@ void SingleWindowPass::insertBefore(inst_iterator instToWrite, inst_iterator sta
     --prevIterator;
     BasicBlock* parent = instToWrite->getParent();
     if (prevIterator->isTerminator() && depthleft != 1) {
-        for (auto i = pred_begin(parent); i != pred_end(parent); ++i) {
+        for (BasicBlock* pred: predecessors(parent)) {
             inst_iterator predIter(prevIterator);
-            BasicBlock* pred = *i;
             while (predIter->getParent() != pred && predIter != startInst) {
                 --predIter;
             }
             // reached beginning, predecessor after current block
             if (predIter == startInst) {
-                predIter = instToWrite;
-                while (predIter->getParent() != pred) {
+                while (predIter->getParent() != pred && !predIter->isTerminator()) {
                     ++predIter;
                 }
             }
@@ -133,8 +131,7 @@ void SingleWindowPass::insertAfter(inst_iterator instToWrite, inst_iterator endI
             }
             // reached end, successor is before current basic block
             if (succIter == endInst) {
-                succIter = instToWrite;
-                while (succIter->getParent() != succ) {
+                while (succIter->getParent() != succ && !(--inst_iterator(succIter))->isTerminator()) {
                     --succIter;
                 }
             }

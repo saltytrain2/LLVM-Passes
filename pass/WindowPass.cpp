@@ -17,8 +17,9 @@
 
 using namespace llvm;
 
-WindowPass::WindowPass(std::string outputFile)
+WindowPass::WindowPass(std::string outputFile, std::string functionName)
     : mOutputStream(outputFile, std::ios::out),
+      mFunctionName(functionName),
       mPredWindows(std::make_unique<std::vector<std::string>>())
 {}
 
@@ -74,16 +75,14 @@ void WindowPass::insertBefore(inst_iterator instToWrite, inst_iterator startInst
     inst_iterator prevIterator(instToWrite);
     --prevIterator;
     if (prevIterator->isTerminator() && depthleft != 1) {
-        for (auto i = pred_begin(parent); i != pred_end(parent); ++i) {
+        for (BasicBlock* pred: predecessors(parent)) {
             inst_iterator predIter(prevIterator);
-            BasicBlock* pred = *i;
             while (predIter->getParent() != pred && predIter != startInst) {
-                --prevIterator;
+                --predIter;
             }
             // reached beginning, predecessor after current block
             if (predIter == startInst) {
-                predIter = instToWrite;
-                while (predIter->getParent() != pred) {
+                while (predIter->getParent() != pred && !predIter->isTerminator()) {
                     ++predIter;
                 }
             }
@@ -112,16 +111,14 @@ void WindowPass::insertAfter(inst_iterator instToWrite, inst_iterator endInst, s
     inst_iterator nextIterator(instToWrite);
     ++nextIterator;
     if (instToWrite->isTerminator() && instToWrite->getNumSuccessors() != 0) {
-        for (auto i = succ_begin(parent); i != succ_end(parent); ++i) {
+        for (BasicBlock* succ: successors(parent)) {
             inst_iterator succIter(nextIterator);
-            BasicBlock* succ = *i;
             while (succIter->getParent() != succ && succIter != endInst) {
                 ++succIter;
             }
-            // reached end, successor is before current block
+            // reached end, successor is before current basic block
             if (succIter == endInst) {
-                succIter = instToWrite;
-                while (succIter->getParent() != succ) {
+                while (succIter->getParent() != succ && !(--inst_iterator(succIter))->isTerminator()) {
                     --succIter;
                 }
             }
@@ -145,6 +142,9 @@ bool WindowPass::runOnModule(Module& M)
 {
     for (auto& F: M) {
         if (F.isDeclaration())
+            continue;
+
+        if (!F.getName().contains(mFunctionName))
             continue;
 
         for (inst_iterator i = inst_begin(F); i != inst_end(F); ++i) {
