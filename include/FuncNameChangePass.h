@@ -15,7 +15,7 @@
 class FuncNameChangePass : public llvm::PassInfoMixin<FuncNameChangePass>
 {
 public:
-    FuncNameChangePass(std::string outputFile, std::string functionName);
+    FuncNameChangePass();
     inline static bool isRequired() { return true; }
     llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
 
