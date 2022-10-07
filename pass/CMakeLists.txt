@@ -32,3 +32,4 @@ set(PASS_SOURCES
 
 add_library(ResearchPasses SHARED ${PASS_SOURCES})
 target_include_directories(ResearchPasses PRIVATE ${INCLUDE_DIR})
+target_link_libraries(ResearchPasses PRIVATE jsoncpp_lib)

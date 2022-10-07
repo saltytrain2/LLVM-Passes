@@ -4,35 +4,40 @@
 #include <algorithm>
 #include <fstream>
 #include <memory>
+#include <json/json.h>
 
 #include "llvm/IR/Function.h"
 
 using namespace llvm;
 
-WindowPass::WindowPass()
+FuncNameChangePass::FuncNameChangePass(std::string file)
+    : mOutputFile(file)
 {}
 
-PreservedAnalyses WindowPass::run(Module& M, ModuleAnalysisManager&)
+PreservedAnalyses FuncNameChangePass::run(Module& M, ModuleAnalysisManager&)
 {
     return runOnModule(M) ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
-bool WindowPass::runOnModule(Module& M)
+bool FuncNameChangePass::runOnModule(Module& M)
 {
+    Json::Value root;
+
     int counter = 0;
+    bool bModified = false;
     for (auto& F: M) {
         if (F.isDeclaration())
             continue;
         
-        std::string name = "@@" + "func" + std::to_string(counter) + "@@"
-        F.setName(name)
+        std::string oldname = std::string(F.getName());
+        std::string newname = "COMBOTESTFUN" + std::to_string(counter);
+        F.setName(newname);
+        bModified = true;
 
-        // if (!F.getName().contains(mFunctionName))
-        //     continue;
-
-        // for (inst_iterator i = inst_begin(F); i != inst_end(F); ++i) {
-        //     createWindows(i, inst_begin(F), inst_end(F));
-        // }
+        root[newname] = oldname;
+        ++counter;
     }
-    return false;
+    
+    mOutputFile << root;
+    return bModified;
 }

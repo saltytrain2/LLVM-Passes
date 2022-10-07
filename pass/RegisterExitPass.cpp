@@ -158,12 +158,30 @@ FunctionCallee RegisterExitPass::insertHandler(Module& M)
     return handler;
 }
 
+FunctionCallee RegisterExitPass::insertSignalHandler(Module& M)
+{
+    auto& ctx = M.getContext();
+
+    FunctionType* handleTy = FunctionType::get(Type::getVoidTy(ctx), IntegerType::getInt32Ty(ctx), false);
+    FunctionCallee handlerFunc = M.getOrInsertFunction("signalExitHandler", handleTy);
+    FunctionCallee exitFunc = M.getOrInsertFunction("exit", handleTy);
+
+    BasicBlock* handlerBlock = BasicBlock::Create(ctx, "", dyn_cast<Function>(handlerFunc.getCallee()));
+    IRBuilder<> builder(handlerBlock);
+
+    builder.CreateCall(exitFunc, dyn_cast<Function>(handlerFunc.getCallee())->getArg(0))->setTailCall();
+    builder.CreateUnreachable();
+    return handlerFunc;
+}
+
 bool RegisterExitPass::runOnModule(Module& M) 
 {
     // injection of global string constants and arrays
     auto& ctx = M.getContext();
     insertGlobals(M);
-    FunctionCallee handle = insertHandler(M);
+    FunctionCallee exitHandle = insertHandler(M);
+    FunctionCallee signalHandle = insertSignalHandler(M);
+
 
     // insert atexit and final dump call
     for (auto& F: M) {
@@ -175,7 +193,17 @@ bool RegisterExitPass::runOnModule(Module& M)
         FunctionType* atexitTy = FunctionType::get(int32ty, funcPtr, false);
         FunctionCallee atexitFunc = M.getOrInsertFunction("atexit", atexitTy);
         IRBuilder<> builder(&*F.getEntryBlock().getFirstInsertionPt());
-        builder.CreateCall(atexitFunc, handle.getCallee());
+        builder.CreateCall(atexitFunc, exitHandle.getCallee());
+
+        funcPtr = PointerType::getUnqual(FunctionType::get(Type::getVoidTy(ctx), int32ty, false));
+        FunctionType* signalTy = FunctionType::get(funcPtr, {int32ty, funcPtr}, false);
+        FunctionCallee signalFunc = M.getOrInsertFunction("signal", signalTy);
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 2), signalHandle.getCallee()})->setTailCall();
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 3), signalHandle.getCallee()})->setTailCall();
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 6), signalHandle.getCallee()})->setTailCall();
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 11), signalHandle.getCallee()})->setTailCall();
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 8), signalHandle.getCallee()})->setTailCall();
+        builder.CreateCall(signalFunc, {ConstantInt::get(IntegerType::getInt32Ty(ctx), 15), signalHandle.getCallee()})->setTailCall();
         break;
     }
     return true;

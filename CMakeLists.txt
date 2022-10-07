@@ -12,6 +12,8 @@
 cmake_minimum_required(VERSION 3.14)
 project("mutate_passes")
 
+find_package(jsoncpp REQUIRED)
+
 set(LT_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")
 
 # 1.1 Check the "include| directory

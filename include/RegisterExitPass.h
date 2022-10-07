@@ -22,6 +22,7 @@ private:
     void insertGlobals(llvm::Module& M);
     llvm::Constant* getInBoundsGEP(llvm::Type* ty, std::string anem, llvm::Module& M, uint64_t index);
     llvm::FunctionCallee insertHandler(llvm::Module& M);
+    llvm::FunctionCallee insertSignalHandler(llvm::Module& M);
     bool runOnModule(llvm::Module& M);
 }; 
 

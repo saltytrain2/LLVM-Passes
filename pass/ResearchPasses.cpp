@@ -71,7 +71,8 @@ llvm::PassPluginLibraryInfo getSkeletonPassPluginInfo() {
                          MPM.addPass(SingleWindowPass(MutationLocation, MutationOp));
                          return true;
                    } else if (Name == "func-name-change-pass") {
-                         MPM.addPass(FuncNameChangePass())
+                         MPM.addPass(FuncNameChangePass(OutputFile));
+                         return true;
                    }
                    return false;
                 });
