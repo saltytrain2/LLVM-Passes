@@ -5,8 +5,8 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/Function.h"
-using namespace llvm;
 
+namespace llvm {
 class SkeletonPass : public PassInfoMixin<SkeletonPass>
 {
 public:
@@ -16,5 +16,6 @@ public:
 private:
     bool runOnFunction(Function& F);
 };
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__SKELETONPASS_H

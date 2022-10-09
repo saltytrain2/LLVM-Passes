@@ -6,8 +6,8 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
 
-using namespace llvm;
 
+namespace llvm {
 class MemoryPass : public PassInfoMixin<MemoryPass>
 {
 public:
@@ -17,6 +17,6 @@ public:
 private:
     bool runOnFunction(Function& F);
 };
-
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__MEMORYPASS_H

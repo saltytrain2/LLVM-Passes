@@ -12,37 +12,39 @@
 #include "llvm/IR/IRBuilder.h"
 
 
-class MutatePass : public llvm::PassInfoMixin<MutatePass>
+namespace llvm {
+class MutatePass : public PassInfoMixin<MutatePass>
 {
 public:
     MutatePass(std::string mutationOp, uint32_t mutationLoc, std::string swapParamNums, std::string hash);
     inline static bool isRequired() { return true; }
-    llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager&);
 
 private:
     uint32_t mMutationLoc;
     std::string mMutationOp;
     std::string mSwapParamNums;
     std::string mHash;
-    bool runOnModule(llvm::Module& M);
+    bool runOnModule(Module& M);
 
-    llvm::Instruction* getMutantLoadInst(llvm::Instruction* I);
-    llvm::Instruction* getMutantCallInst(llvm::Instruction* I, llvm::Module& M);
-    bool getMutantBranchInst(llvm::Instruction* I);
-    llvm::Value* getTypeCast(llvm::IRBuilder<>& builder, llvm::Value* firstParam, llvm::Value* secondParam);
-    llvm::Instruction* getMutantBinaryIntegerInst(llvm::BinaryOperator* binop);
-    llvm::Instruction* getMutantBinaryFloatingInst(llvm::BinaryOperator* binop);
-    llvm::Instruction* getMutantBinaryLogicalInst(llvm::BinaryOperator* binop);
-    llvm::Instruction* getMutantBinaryShiftInst(llvm::BinaryOperator* binop);
-    llvm::Instruction* getMutantBinaryInst(llvm::Instruction* I);
-    llvm::Instruction* getMutantIcmpUnsignedInst(llvm::ICmpInst* cmpInst);
-    llvm::Instruction* getMutantIcmpSignedInst(llvm::ICmpInst* cmpInst);
-    llvm::Instruction* getMutantIcmpInst(llvm::Instruction* I);
-    llvm::Instruction* getMutantFcmpOrderedInst(llvm::FCmpInst* cmpInst);
-    llvm::Instruction* getMutantFcmpUnorderedInst(llvm::FCmpInst* cmpInst);
-    llvm::Instruction* getMutantFcmpInst(llvm::Instruction* I);
-    llvm::Instruction* getMutantIntegerSignCastInst(llvm::Instruction* I);
+    Instruction* getMutantLoadInst(Instruction* I);
+    Instruction* getMutantCallInst(Instruction* I, Module& M);
+    bool getMutantBranchInst(Instruction* I);
+    Value* getTypeCast(IRBuilder<>& builder, Value* firstParam, Value* secondParam);
+    Instruction* getMutantBinaryIntegerInst(BinaryOperator* binop);
+    Instruction* getMutantBinaryFloatingInst(BinaryOperator* binop);
+    Instruction* getMutantBinaryLogicalInst(BinaryOperator* binop);
+    Instruction* getMutantBinaryShiftInst(BinaryOperator* binop);
+    Instruction* getMutantBinaryInst(Instruction* I);
+    Instruction* getMutantIcmpUnsignedInst(ICmpInst* cmpInst);
+    Instruction* getMutantIcmpSignedInst(ICmpInst* cmpInst);
+    Instruction* getMutantIcmpInst(Instruction* I);
+    Instruction* getMutantFcmpOrderedInst(FCmpInst* cmpInst);
+    Instruction* getMutantFcmpUnorderedInst(FCmpInst* cmpInst);
+    Instruction* getMutantFcmpInst(Instruction* I);
+    Instruction* getMutantIntegerSignCastInst(Instruction* I);
     
 };
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__MUTATEPASS_H

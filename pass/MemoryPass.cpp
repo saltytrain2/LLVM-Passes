@@ -19,6 +19,8 @@
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/DerivedTypes.h"
 
+using namespace llvm;
+
 bool MemoryPass::runOnFunction(Function& F) {
       bool bModified = false;
       int counter = 0;

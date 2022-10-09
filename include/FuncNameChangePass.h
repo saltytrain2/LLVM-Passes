@@ -12,6 +12,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/IRBuilder.h"
 
+namespace llvm {
 class FuncNameChangePass : public llvm::PassInfoMixin<FuncNameChangePass>
 {
 public:
@@ -23,5 +24,6 @@ private:
     std::ofstream mOutputFile;
     bool runOnModule(llvm::Module& M);
 };
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__FUNCNAMECHANGEPASS_H

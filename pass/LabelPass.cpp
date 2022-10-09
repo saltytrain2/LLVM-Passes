@@ -9,6 +9,8 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/DerivedTypes.h"
 
+using namespace llvm;
+
 LabelPass::LabelPass(std::string file)
 {
     mStream.open(file, std::ios::out);

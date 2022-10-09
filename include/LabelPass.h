@@ -8,7 +8,7 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
 
-using namespace llvm;
+namespace llvm {
 
 class LabelPass : public PassInfoMixin<LabelPass>
 {
@@ -22,5 +22,6 @@ private:
     std::ofstream mStream;
     bool runOnModule(Module& M);
 };
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__LABELPASS_H

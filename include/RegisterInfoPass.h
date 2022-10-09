@@ -8,23 +8,24 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
 
-class RegisterInfoPass : public llvm::PassInfoMixin<RegisterInfoPass>
+namespace llvm {
+class RegisterInfoPass : public PassInfoMixin<RegisterInfoPass>
 {
 public:
     RegisterInfoPass(uint32_t mutationLoc);
     inline static bool isRequired() { return true; }
-    llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager&);
 
 private:
     uint32_t mMutationLoc;
 
-    bool runOnModule(llvm::Module& M);
-    void insertGlobals(llvm::Module& M);
-    void insertFunctions(llvm::Module& M);
-    void insertConstants(llvm::Module& M);
-    llvm::Constant* getInBoundsGEP(llvm::Type* ty, std::string name, llvm::Module& M, uint64_t index);
-    void injectRegisterInsts(llvm::Instruction* inst, llvm::Module& M);
+    bool runOnModule(Module& M);
+    void insertGlobals(Module& M);
+    void insertFunctions(Module& M);
+    void insertConstants(Module& M);
+    Constant* getInBoundsGEP(Type* ty, std::string name, Module& M, uint64_t index);
+    void injectRegisterInsts(Instruction* inst, Module& M);
 };
-
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__REGISTERINFOPASS_H

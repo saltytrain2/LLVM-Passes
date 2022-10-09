@@ -2,28 +2,28 @@
 #define _LLVMPASSES__INCLUDE__REGISTEREXITPASS_H
 
 #include <string>
+#include <cstdint>
 
-#include "llvm/Pass.h"
-#include "llvm/IR/Function.h"
-#include "llvm/Passes/PassPlugin.h"
-#include "llvm/Passes/PassBuilder.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 
-
-class RegisterExitPass : public llvm::PassInfoMixin<RegisterExitPass>
+namespace llvm {
+class RegisterExitPass : public PassInfoMixin<RegisterExitPass>
 {
 public:
     RegisterExitPass(std::string outputFile);
     inline static bool isRequired() { return true; }
-    llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager&);
 
 private:
     std::string mOutputFile;
 
-    void insertGlobals(llvm::Module& M);
-    llvm::Constant* getInBoundsGEP(llvm::Type* ty, std::string anem, llvm::Module& M, uint64_t index);
-    llvm::FunctionCallee insertHandler(llvm::Module& M);
-    llvm::FunctionCallee insertSignalHandler(llvm::Module& M);
-    bool runOnModule(llvm::Module& M);
+    void insertGlobals(Module& M);
+    Constant* getInBoundsGEP(Type* ty, std::string anem, Module& M, uint64_t index);
+    FunctionCallee insertHandler(Module& M);
+    FunctionCallee insertSignalHandler(Module& M);
+    bool runOnModule(Module& M);
 }; 
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__REGISTEREXITPASS_H

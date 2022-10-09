@@ -12,23 +12,25 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/IRBuilder.h"
 
-class WindowPass : public llvm::PassInfoMixin<WindowPass>
+namespace llvm {
+class WindowPass : public PassInfoMixin<WindowPass>
 {
 public:
     WindowPass(std::string outputFile, std::string functionName);
     inline static bool isRequired() { return true; }
-    llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager&);
+    PreservedAnalyses run(Module& M, ModuleAnalysisManager&);
 
 private:
     std::ofstream mOutputStream;
     std::string mFunctionName;
     std::unique_ptr<std::vector<std::string>> mPredWindows;
 
-    void write(llvm::Instruction* I, std::string& window);
-    void createWindows(llvm::inst_iterator instToWrite, llvm::inst_iterator startInst, llvm::inst_iterator endInst);
-    void insertBefore(llvm::inst_iterator instToWrite, llvm::inst_iterator startInst, std::string window, uint8_t depthleft);
-    void insertAfter(llvm::inst_iterator instToWrite, llvm::inst_iterator endInst, std::string window, uint8_t depthleft);
-    bool runOnModule(llvm::Module& M);
+    void write(Instruction* I, std::string& window);
+    void createWindows(inst_iterator instToWrite, inst_iterator startInst, inst_iterator endInst);
+    void insertBefore(inst_iterator instToWrite, inst_iterator startInst, std::string window, uint8_t depthleft);
+    void insertAfter(inst_iterator instToWrite, inst_iterator endInst, std::string window, uint8_t depthleft);
+    bool runOnModule(Module& M);
 };
+} // namespace llvm
 
 #endif // _LLVMPASSES__INCLUDE__WINDOWPASS_H
