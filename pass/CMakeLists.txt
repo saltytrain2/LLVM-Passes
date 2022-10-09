@@ -27,9 +27,9 @@ set(PASS_SOURCES
     RegisterExitPass.cpp
     WindowPass.cpp
     SingleWindowPass.cpp
-    FuncNameChangePass.cpp
+    $<$<BOOL:${OPTIONAL_PASSES}>:FuncNameChangePass.cpp>
 )
 
 add_library(ResearchPasses SHARED ${PASS_SOURCES})
 target_include_directories(ResearchPasses PRIVATE ${INCLUDE_DIR})
-target_link_libraries(ResearchPasses PRIVATE jsoncpp_lib)
+target_link_libraries(ResearchPasses PRIVATE $<$<BOOL:${OPTIONAL_PASSES}>:jsoncpp_lib>)

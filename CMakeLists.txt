@@ -12,7 +12,11 @@
 cmake_minimum_required(VERSION 3.14)
 project("mutate_passes")
 
-find_package(jsoncpp REQUIRED)
+option(OPTIONAL_PASSES "build the passes that require external libraries" OFF)
+
+if (OPTIONAL_PASSES)
+  find_package(jsoncpp REQUIRED)
+endif()
 
 set(LT_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")
 
